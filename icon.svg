@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f1a2e"/>
+      <stop offset="100%" stop-color="#0b1326"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="14" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <!-- Drum key — bold filled shapes for clarity at small sizes -->
+  <g filter="url(#glow)" fill="#00f5ff">
+    <!-- T-handle crossbar -->
+    <rect x="110" y="68" width="292" height="36" rx="18"/>
+    <!-- Shaft -->
+    <rect x="234" y="68" width="44" height="240" rx="6"/>
+    <!-- Socket outer -->
+    <rect x="176" y="296" width="160" height="160" rx="24" fill="none" stroke="#00f5ff" stroke-width="36"/>
+    <!-- Socket inner hole -->
+    <rect x="224" y="344" width="64" height="64" rx="10" fill="#0b1326" stroke="#00f5ff" stroke-width="16"/>
+  </g>
+</svg>
