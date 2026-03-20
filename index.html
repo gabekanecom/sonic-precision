@@ -2303,6 +2303,8 @@ function renderLugs() {
   document.getElementById('lug-total-freq').textContent = avgFreq != null ? avgFreq.toFixed(1) : '--';
   // Preserve active lug index if valid, otherwise reset to 0
   if (AppState.activeLugIndex >= numLugs) AppState.activeLugIndex = 0;
+  // Auto-enable measuring when on the lugs page
+  AppState.lugMeasuring = true;
   const activeIdx = AppState.activeLugIndex;
   const headLabel = AppState.activeHead === 'batter' ? 'BATTER' : 'RESONANT';
   document.getElementById('lug-active-label').textContent = 'LUG ' + String(activeIdx + 1).padStart(2, '0');
