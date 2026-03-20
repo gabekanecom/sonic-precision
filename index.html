@@ -1,0 +1,3035 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="theme-color" content="#0b1326"/>
+<title>Sonic Precision — Drum Tuner</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script>
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        "on-primary-container":"#006c71","secondary":"#b9c7e0","primary-container":"#00f5ff",
+        "surface":"#0b1326","on-error":"#690005","surface-bright":"#31394d","on-primary":"#003739",
+        "secondary-fixed":"#d5e3fd","surface-container-low":"#131b2e","on-surface":"#dae2fd",
+        "on-secondary":"#233144","inverse-surface":"#dae2fd","surface-tint":"#00dce5",
+        "background":"#0b1326","surface-container-highest":"#2d3449","surface-dim":"#0b1326",
+        "tertiary-container":"#ffdb3f","primary":"#e9feff","error":"#ffb4ab","error-container":"#93000a",
+        "surface-variant":"#2d3449","secondary-container":"#3c4a5e","on-background":"#dae2fd",
+        "surface-container-high":"#222a3d","on-surface-variant":"#b9caca","outline":"#849495",
+        "surface-container-lowest":"#060e20","on-secondary-container":"#abb9d2",
+        "primary-fixed":"#63f7ff","surface-container":"#171f33","outline-variant":"#3a494a",
+        "tertiary":"#fff9f0","primary-fixed-dim":"#00dce5","inverse-primary":"#00696e"
+      },
+      fontFamily: { "headline":["Space Grotesk"],"body":["Space Grotesk"],"label":["Space Grotesk"] },
+      borderRadius: {"DEFAULT":"0.125rem","lg":"0.25rem","xl":"0.5rem","full":"0.75rem"},
+    },
+  },
+}
+</script>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { font-family: 'Space Grotesk', sans-serif; overscroll-behavior: none; }
+  .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+  .signal-glow { text-shadow: 0 0 12px rgba(0,245,255,0.6); }
+  .oscilloscope-bg {
+    background-image: radial-gradient(circle at center, #131b2e 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+  .glass-panel { background: rgba(45,52,73,0.6); backdrop-filter: blur(20px); }
+  .drum-glow { box-shadow: 0 0 20px rgba(0,245,255,0.3); }
+  .page { display: none; }
+  .page.active { display: flex; flex-direction: column; }
+  .waveform-gradient { background: linear-gradient(to top, rgba(0,245,255,0.2) 0%, rgba(11,19,38,0) 100%); }
+  .lug-node { position: absolute; }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: #0b1326; }
+  ::-webkit-scrollbar-thumb { background: #3a494a; }
+  @keyframes pulse-ring { 0% { transform: scale(1); opacity: 0.6; } 100% { transform: scale(1.15); opacity: 0; } }
+  .pulse-ring { animation: pulse-ring 2s ease-out infinite; }
+  input[type="range"] { -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer; }
+  input[type="range"]::-webkit-slider-runnable-track { height: 2px; background: #2d3449; }
+  input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 2px; height: 24px; background: #00f5ff; margin-top: -11px; }
+  .nav-item { transition: all 0.2s; }
+  .nav-item.active-nav { color: #00F5FF; filter: drop-shadow(0 0 8px #00F5FF); }
+  .nav-item:not(.active-nav) { color: #b9c7e0; opacity: 0.5; }
+  .nav-item:not(.active-nav):hover { opacity: 0.8; }
+</style>
+</head>
+<body class="bg-surface text-on-surface font-body overflow-x-hidden selection:bg-primary-container selection:text-on-primary min-h-screen flex flex-col">
+
+<!-- ═══════ TOP APP BAR ═══════ -->
+<header class="bg-[#0b1326] fixed top-0 w-full z-50 flex justify-between items-center px-5 h-14 safe-area-top">
+  <div class="flex items-center gap-2">
+    <span class="material-symbols-outlined text-[#00F5FF]" style="font-size:22px">graphic_eq</span>
+    <h1 class="text-lg font-bold tracking-tighter text-[#00F5FF]">SONIC PRECISION</h1>
+  </div>
+  <div class="flex items-center gap-3">
+    <span id="header-status" class="uppercase tracking-[0.1em] text-[0.6rem] text-[#00F5FF] hidden sm:inline">CALIBRATED</span>
+    <span class="material-symbols-outlined text-[#b9c7e0] hover:text-[#63f7ff] transition-colors cursor-pointer text-xl" onclick="openSettings()">settings</span>
+  </div>
+</header>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- PAGE: TUNER                                        -->
+<!-- ═══════════════════════════════════════════════════ -->
+<main id="page-tuner" class="page active flex-1 pt-14 pb-20 px-5 overflow-y-auto oscilloscope-bg">
+  <!-- Metadata -->
+  <div class="grid grid-cols-2 mb-6 mt-4 items-end">
+    <div>
+      <p class="uppercase tracking-[0.1em] text-[0.6rem] text-secondary opacity-60">TARGET INSTRUMENT</p>
+      <div class="relative">
+        <h2 class="text-lg font-headline text-primary-container uppercase cursor-pointer flex items-center gap-1.5 hover:opacity-80 transition-opacity" id="tuner-target" onclick="toggleDrumPicker()">SNARE SIDE <span class="material-symbols-outlined text-sm opacity-60" id="tuner-target-chevron">expand_more</span></h2>
+        <div id="drum-picker" class="hidden absolute left-0 top-full mt-1 z-50 bg-surface-container-high/95 backdrop-blur-xl border border-outline-variant/20 shadow-xl min-w-[180px] max-h-[240px] overflow-y-auto"></div>
+      </div>
+    </div>
+    <div class="text-right">
+      <p class="uppercase tracking-[0.1em] text-[0.6rem] text-secondary opacity-60">INPUT GAIN</p>
+      <p class="text-primary font-mono text-xs tracking-widest" id="tuner-gain">--dB</p>
+    </div>
+  </div>
+  <!-- Head Toggle -->
+  <div id="tuner-head-toggle" class="max-w-sm mx-auto"></div>
+
+  <!-- Preset Quick-Select -->
+  <div class="max-w-sm mx-auto mb-3">
+    <div class="flex items-center gap-2">
+      <span class="text-[0.6rem] uppercase tracking-[0.1em] text-secondary shrink-0">PRESET</span>
+      <div class="relative flex-1">
+        <select id="tuner-preset-select" onchange="loadPresetFromTuner(this.value)" class="w-full bg-surface-container-low text-primary text-xs py-2 px-3 pr-8 border-none appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary-container uppercase tracking-wider">
+          <option value="">— CUSTOM —</option>
+        </select>
+        <span class="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-secondary text-sm pointer-events-none">expand_more</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Target Frequency Bar -->
+  <div id="tuner-target-bar" class="bg-surface-container-low p-3 mb-4 flex items-center justify-between max-w-sm mx-auto">
+    <div class="flex items-center gap-3">
+      <span class="text-[0.6rem] uppercase tracking-[0.1em] text-secondary">TARGET</span>
+      <span id="tuner-target-freq" class="text-lg font-bold text-primary font-headline">192 <span class="text-xs font-normal text-secondary">Hz</span></span>
+    </div>
+    <div id="tuner-delta" class="text-right">
+      <span class="text-[0.6rem] uppercase tracking-[0.1em] text-secondary">DELTA</span>
+      <p id="tuner-delta-val" class="text-sm font-mono font-bold text-outline">-- Hz</p>
+    </div>
+  </div>
+
+  <!-- Oscilloscope Visualizer -->
+  <div class="relative w-full max-w-sm mx-auto aspect-square flex items-center justify-center mb-4">
+    <div class="absolute inset-0 border border-outline-variant/10 rounded-full"></div>
+    <div class="absolute inset-8 border border-outline-variant/5 rounded-full"></div>
+    <!-- Spinning ring — color changes based on delta -->
+    <div id="tuner-ring" class="absolute inset-0 rounded-full border-4 border-primary-container/20 border-t-primary-container transition-all duration-300" style="animation: spin 4s linear infinite"></div>
+    <!-- Status badge -->
+    <div id="tuner-status-badge" class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-3 px-3 py-1 rounded-sm text-[9px] font-bold uppercase tracking-[0.15em] bg-surface-container-high text-secondary transition-all">
+      LISTENING
+    </div>
+    <!-- Central readout -->
+    <div class="text-center z-10">
+      <div class="flex items-baseline justify-center gap-1">
+        <span id="tuner-freq" class="text-[4.5rem] font-bold font-headline leading-none text-primary signal-glow">--</span>
+        <span class="uppercase tracking-[0.1em] text-[0.6rem] text-secondary">Hz</span>
+      </div>
+      <div class="mt-2 bg-surface-container-high/60 backdrop-blur-md px-5 py-1.5 border-l-2 border-primary-container inline-block">
+        <span id="tuner-note" class="text-2xl font-bold font-headline text-primary-container tracking-tighter">--</span>
+        <span id="tuner-cents" class="ml-2 text-secondary font-mono text-xs">--</span>
+      </div>
+      <!-- Stability indicator -->
+      <div id="tuner-stability" class="mt-2 flex items-center justify-center gap-1.5 opacity-0 transition-opacity duration-300">
+        <span class="w-1.5 h-1.5 rounded-full bg-primary-container animate-pulse"></span>
+        <span class="text-[9px] uppercase tracking-widest text-primary-container font-bold">STABLE</span>
+      </div>
+    </div>
+    <!-- Direction indicator: shows arrow when off-target -->
+    <div id="tuner-direction" class="absolute bottom-4 left-1/2 -translate-x-1/2 text-center opacity-0 transition-opacity">
+      <span id="tuner-dir-text" class="text-[10px] uppercase tracking-wider text-secondary font-bold"></span>
+    </div>
+    <!-- Reticle lines -->
+    <div class="absolute h-px w-10 bg-primary-container/40 left-0 top-1/2"></div>
+    <div class="absolute h-px w-10 bg-primary-container/40 right-0 top-1/2"></div>
+    <div class="absolute w-px h-10 bg-primary-container/40 top-0 left-1/2"></div>
+    <div class="absolute w-px h-10 bg-primary-container/40 bottom-0 left-1/2"></div>
+  </div>
+
+  <!-- Save Reading Button (appears when stable) -->
+  <div id="tuner-save-row" class="max-w-sm mx-auto mb-4 hidden">
+    <button onclick="saveTunerReading()" class="w-full py-3 bg-primary-container text-on-primary font-bold text-[10px] uppercase tracking-[0.15em] flex items-center justify-center gap-2 active:scale-95 transition-all shadow-[0_0_15px_rgba(0,245,255,0.3)]">
+      <span class="material-symbols-outlined text-sm">save</span> SAVE READING
+    </button>
+  </div>
+
+  <!-- Controls -->
+  <div class="grid grid-cols-1 gap-3 max-w-md mx-auto">
+    <!-- Sensitivity Toggle -->
+    <div class="bg-surface-container-low p-5">
+      <p class="uppercase tracking-[0.1em] text-[0.6rem] text-secondary mb-3">SENSITIVITY MODE</p>
+      <div class="flex gap-2">
+        <button id="btn-lab" onclick="setSensitivity('lab')" class="flex-1 py-2 bg-primary-container text-on-primary font-bold text-[10px] uppercase tracking-wider active:scale-95 duration-100">Laboratory</button>
+        <button id="btn-stage" onclick="setSensitivity('stage')" class="flex-1 py-2 bg-surface-container-high text-secondary font-bold text-[10px] uppercase tracking-wider hover:text-primary transition-colors active:scale-95 duration-100">Stage</button>
+      </div>
+      <p id="sensitivity-desc" class="text-[10px] text-outline mt-3 leading-relaxed">High-precision mode optimized for isolated acoustic environments.</p>
+    </div>
+    <!-- Transient Analysis -->
+    <div class="bg-surface-container-low p-5 overflow-hidden relative">
+      <div class="flex justify-between items-start z-10 relative">
+        <p class="uppercase tracking-[0.1em] text-[0.6rem] text-secondary">TRANSIENT ANALYSIS</p>
+        <span class="font-mono text-[10px] text-primary-container" id="tuner-decay">DECAY: --</span>
+      </div>
+      <canvas id="tuner-waveform" class="w-full h-16 mt-3 relative z-10" width="400" height="64"></canvas>
+      <div class="absolute inset-0 opacity-10 pointer-events-none" style="background-image: linear-gradient(#3a494a 1px, transparent 1px), linear-gradient(90deg, #3a494a 1px, transparent 1px); background-size: 10px 10px;"></div>
+    </div>
+  </div>
+
+  <!-- Mic FAB -->
+  <button id="mic-btn" onclick="toggleMic()" class="fixed bottom-24 right-5 w-14 h-14 bg-primary-container rounded-none flex items-center justify-center shadow-[0_0_20px_rgba(0,245,255,0.4)] active:scale-90 duration-200 z-40">
+    <span class="material-symbols-outlined text-on-primary font-bold" id="mic-icon">mic</span>
+  </button>
+</main>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- PAGE: KIT                                          -->
+<!-- ═══════════════════════════════════════════════════ -->
+<main id="page-kit" class="page flex-1 pt-14 pb-20 px-5 overflow-y-auto">
+  <div class="flex justify-between items-center mt-4 mb-2">
+    <div>
+      <p class="uppercase tracking-[0.1em] text-[0.6rem] text-secondary opacity-60">SYSTEM STATUS</p>
+      <p class="text-primary-container font-medium text-sm">CALIBRATED / ACTIVE</p>
+    </div>
+    <button onclick="showKitConfig()" class="flex items-center gap-1.5 text-secondary hover:text-primary-container transition-colors active:scale-95">
+      <span class="material-symbols-outlined text-lg">build</span>
+      <span class="text-[9px] uppercase tracking-wider">CONFIG</span>
+    </button>
+  </div>
+
+  <!-- Drum Kit Visual (dynamically generated) -->
+  <div id="kit-visual" class="relative w-full max-w-sm mx-auto my-2" style="aspect-ratio:1/0.75"></div>
+
+  <!-- Kit Info Panel -->
+  <div class="bg-surface-container-low p-5 border-l-2 border-primary-container max-w-sm mx-auto">
+    <div class="flex justify-between items-center mb-3">
+      <h2 class="text-xl font-bold tracking-tight">KIT OVERVIEW</h2>
+      <span id="kit-preset-badge" class="text-[9px] uppercase tracking-wider text-primary-container opacity-0 transition-opacity"></span>
+    </div>
+    <div id="kit-head-toggle"></div>
+    <div class="space-y-3">
+      <div class="flex justify-between items-end border-b border-outline-variant/15 pb-2">
+        <span class="text-[0.6rem] uppercase tracking-[0.1em] text-secondary">ACTIVE COMPONENT</span>
+        <span class="text-primary font-bold" id="kit-active">SNARE DRUM</span>
+      </div>
+      <div class="flex justify-between items-end border-b border-outline-variant/15 pb-2">
+        <span class="text-[0.6rem] uppercase tracking-[0.1em] text-secondary">SIZE</span>
+        <span class="text-primary font-bold" id="kit-size">14"</span>
+      </div>
+      <div class="flex justify-between items-end border-b border-outline-variant/15 pb-2">
+        <span class="text-[0.6rem] uppercase tracking-[0.1em] text-secondary">TARGET FREQ</span>
+        <span class="text-primary font-bold" id="kit-freq">192 HZ</span>
+      </div>
+      <div class="flex justify-between items-end border-b border-outline-variant/15 pb-2">
+        <span class="text-[0.6rem] uppercase tracking-[0.1em] text-secondary">MEASURED FREQ</span>
+        <span class="text-primary font-bold" id="kit-tension">-- HZ</span>
+      </div>
+      <div class="flex justify-between items-end border-b border-outline-variant/15 pb-2">
+        <span class="text-[0.6rem] uppercase tracking-[0.1em] text-secondary">DELTA</span>
+        <span id="kit-delta" class="text-sm font-mono font-bold text-outline">--</span>
+      </div>
+      <div class="flex justify-between items-end border-b border-outline-variant/15 pb-2">
+        <span class="text-[0.6rem] uppercase tracking-[0.1em] text-secondary">LUGS</span>
+        <span id="kit-lugs" class="text-primary font-bold">10</span>
+      </div>
+      <div class="flex justify-between items-end">
+        <span class="text-[0.6rem] uppercase tracking-[0.1em] text-secondary">LAST TUNED</span>
+        <span id="kit-last-tuned" class="text-[10px] font-mono text-outline">NEVER</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Action Buttons -->
+  <div class="grid grid-cols-3 gap-2 max-w-sm mx-auto mt-4">
+    <button onclick="navigateTo('lugs')" class="bg-surface-container-high py-3 px-3 flex flex-col items-center justify-center border-b-2 border-transparent hover:border-primary-container transition-all active:scale-95">
+      <span class="material-symbols-outlined text-secondary scale-75">blur_circular</span>
+      <span class="text-[0.45rem] uppercase mt-1">LUGS</span>
+    </button>
+    <button onclick="navigateTo('resonance')" class="bg-surface-container-high py-3 px-3 flex flex-col items-center justify-center border-b-2 border-transparent hover:border-primary-container transition-all active:scale-95">
+      <span class="material-symbols-outlined text-secondary scale-75">waves</span>
+      <span class="text-[0.45rem] uppercase mt-1">RESONANCE</span>
+    </button>
+    <button onclick="tuneSelectedDrum()" class="bg-primary-container py-3 px-3 flex flex-col items-center justify-center active:scale-95 transition-all">
+      <span class="material-symbols-outlined text-on-primary scale-75">tune</span>
+      <span class="text-[0.45rem] uppercase mt-1 text-on-primary">TUNE</span>
+    </button>
+  </div>
+</main>
+
+<!-- ═══════ KIT CONFIG MODAL ═══════ -->
+<div id="kit-config-modal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/60 backdrop-blur-sm">
+  <div class="bg-surface-container-low p-5 w-[92%] max-w-md max-h-[85vh] overflow-y-auto">
+    <h3 class="text-lg font-bold mb-4 text-primary">CONFIGURE KIT</h3>
+    <p class="text-[9px] text-outline uppercase tracking-wider mb-4">Edit drum sizes, lug counts, and target frequencies. Add or remove drums.</p>
+    <div id="kit-config-list" class="space-y-3"></div>
+    <button onclick="addDrumToKit()" class="w-full mt-4 py-3 bg-surface-container-high hover:bg-surface-container-highest text-primary-container border border-primary-container/20 text-[10px] uppercase tracking-[0.15em] flex items-center justify-center gap-2 active:scale-95 transition-all">
+      <span class="material-symbols-outlined text-sm">add_circle</span> ADD DRUM
+    </button>
+    <div class="flex gap-2 mt-5">
+      <button onclick="closeKitConfig()" class="flex-1 py-2 bg-surface-container-high text-secondary text-[10px] uppercase tracking-wider font-bold active:scale-95">CANCEL</button>
+      <button onclick="saveKitConfig()" class="flex-1 py-2 bg-primary-container text-on-primary text-[10px] uppercase tracking-wider font-bold active:scale-95">SAVE</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- PAGE: LUGS (sub-page of Kit)                       -->
+<!-- ═══════════════════════════════════════════════════ -->
+<main id="page-lugs" class="page flex-1 pt-14 pb-20 px-5 overflow-y-auto">
+  <button onclick="navigateTo('kit')" class="flex items-center gap-1 text-primary-container text-xs uppercase tracking-wider mt-3 mb-4 active:scale-95">
+    <span class="material-symbols-outlined text-sm">arrow_back</span> BACK TO KIT
+  </button>
+  <div id="lugs-head-toggle" class="max-w-sm mx-auto"></div>
+
+  <!-- Drum Head Visualization -->
+  <div class="relative w-72 h-72 mx-auto mb-6">
+    <div class="absolute inset-0 rounded-full border-[6px] border-surface-container-high shadow-[0_0_40px_rgba(0,0,0,0.5)]"></div>
+    <div class="absolute inset-4 rounded-full bg-gradient-to-br from-surface-container-low to-surface-dim border border-outline-variant/20"></div>
+    <div class="absolute inset-0 flex flex-col items-center justify-center z-10">
+      <p class="text-[10px] uppercase tracking-[0.2em] text-secondary mb-1">TOTAL PRESSURE</p>
+      <p id="lug-total-freq" class="text-4xl font-bold text-primary tracking-tighter">188.4</p>
+      <div class="flex items-center gap-1.5 mt-2">
+        <span class="material-symbols-outlined text-primary-container text-sm" style="font-variation-settings:'FILL' 1">check_circle</span>
+        <p class="text-[9px] uppercase tracking-widest text-primary-container font-bold">PHASE LOCKED</p>
+      </div>
+    </div>
+    <!-- Lug nodes will be generated by JS -->
+    <div id="lug-nodes"></div>
+  </div>
+
+  <div class="text-center mb-6">
+    <p class="text-xs uppercase tracking-[0.3em] text-outline mb-1">ACTIVE SENSOR</p>
+    <h2 id="lug-active-label" class="text-lg text-primary font-bold">SNARE SIDE: LUG 01</h2>
+  </div>
+
+  <!-- Target Freq -->
+  <div class="bg-surface-container-low p-4 border-l-2 border-primary-container max-w-sm mx-auto mb-4">
+    <p class="text-[0.6rem] uppercase tracking-[0.1em] text-secondary mb-1">TARGET FREQ</p>
+    <p id="lug-target-freq" class="text-2xl font-bold text-primary signal-glow">188.5 <span class="text-xs font-normal text-secondary">HZ</span></p>
+  </div>
+
+  <!-- Tension Stats -->
+  <div class="bg-surface-container-low p-4 max-w-sm mx-auto mb-4">
+    <p class="text-[0.6rem] uppercase tracking-[0.1em] text-secondary mb-3">TENSION STATS</p>
+    <div class="space-y-3">
+      <div class="flex justify-between items-end">
+        <span class="text-[10px] uppercase text-outline">Deviation</span>
+        <span class="text-sm font-mono text-primary">+0.2%</span>
+      </div>
+      <div class="w-full bg-surface-container-highest h-[2px]"><div class="bg-primary-container h-full w-[62%]"></div></div>
+      <div class="flex justify-between items-end">
+        <span class="text-[10px] uppercase text-outline">Decay</span>
+        <span class="text-sm font-mono text-primary">1.4s</span>
+      </div>
+      <div class="w-full bg-surface-container-highest h-[2px]"><div class="bg-secondary h-full w-[45%] opacity-50"></div></div>
+    </div>
+  </div>
+
+  <!-- Lug Diagnostic Log -->
+  <div class="max-w-sm mx-auto">
+    <p class="text-[0.6rem] uppercase tracking-[0.1em] text-secondary mb-2">DIAGNOSTIC LOG</p>
+    <div id="lug-log" class="space-y-1"></div>
+    <button onclick="resetLugAnalysis()" class="mt-4 w-full bg-surface-container-high hover:bg-surface-container-highest text-primary-fixed border border-primary-container/20 py-3 text-[10px] tracking-[0.2em] uppercase transition-all active:scale-95">
+      RESET ANALYSIS
+    </button>
+  </div>
+</main>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- PAGE: PRESETS                                      -->
+<!-- ═══════════════════════════════════════════════════ -->
+<main id="page-presets" class="page flex-1 pt-14 pb-20 px-5 overflow-y-auto">
+  <div class="mt-4 mb-2">
+    <p class="uppercase tracking-[0.1em] text-[0.6rem] text-secondary opacity-60">ARCHIVE / CONFIGURATIONS</p>
+    <h2 class="text-2xl font-bold tracking-tight">PRESET LIBRARY</h2>
+  </div>
+
+  <!-- Search / Create -->
+  <div class="flex gap-2 mb-6">
+    <div class="flex-1 bg-surface-container-low flex items-center gap-2 px-3 py-2">
+      <span class="material-symbols-outlined text-secondary text-lg">search</span>
+      <input type="text" id="preset-search" placeholder="Filter by genre..." class="bg-transparent border-none text-sm text-primary placeholder-outline focus:outline-none w-full"/>
+    </div>
+    <button onclick="showCreatePreset()" class="bg-primary-container text-on-primary px-4 py-2 font-bold text-[10px] uppercase tracking-wider active:scale-95">CREATE NEW</button>
+  </div>
+
+  <!-- Preset Cards -->
+  <div id="preset-list" class="space-y-4"></div>
+</main>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- PAGE: HISTORY                                      -->
+<!-- ═══════════════════════════════════════════════════ -->
+<main id="page-history" class="page flex-1 pt-14 pb-20 px-5 overflow-y-auto">
+  <div class="mt-4 mb-1">
+    <p class="uppercase tracking-[0.1em] text-[0.6rem] text-secondary opacity-60" id="hist-drum-id">DRUM ID: SN-2940-B</p>
+    <h2 class="text-2xl font-bold tracking-tight">SNARE STABILITY</h2>
+  </div>
+  <div class="mb-6">
+    <p class="uppercase tracking-[0.1em] text-[0.6rem] text-secondary">CALIBRATION STATUS</p>
+    <p class="text-primary-container font-bold flex items-center gap-2">NOMINAL <span class="w-2 h-2 rounded-full bg-primary-container inline-block"></span></p>
+  </div>
+
+  <!-- Frequency Variance Chart -->
+  <div class="bg-surface-container-low p-5 mb-4">
+    <div class="flex justify-between items-start mb-2">
+      <div>
+        <p class="text-[0.6rem] uppercase tracking-[0.1em] text-secondary">30-DAY FREQUENCY VARIANCE (HZ)</p>
+        <p class="text-2xl font-bold text-primary">184.2 <span class="text-xs font-normal text-secondary">AVG PK</span></p>
+      </div>
+      <div class="flex gap-3 text-[9px] uppercase text-secondary">
+        <span class="flex items-center gap-1"><span class="w-3 h-[1px] bg-primary-container inline-block"></span> PITCH</span>
+        <span class="flex items-center gap-1"><span class="w-3 h-[1px] bg-secondary inline-block"></span> TARGET</span>
+      </div>
+    </div>
+    <canvas id="history-chart" class="w-full h-32" width="400" height="128"></canvas>
+    <div class="flex justify-between text-[9px] text-secondary/50 mt-1">
+      <span>30D AGO</span><span>15D AGO</span><span>CURRENT SESSION</span>
+    </div>
+  </div>
+
+  <!-- Environment Cards (user-editable) -->
+  <div class="grid grid-cols-2 gap-1 mb-4">
+    <div class="bg-surface-container-high p-5">
+      <div class="flex justify-between items-center mb-1">
+        <p class="uppercase tracking-[0.1em] text-[0.6rem] text-secondary">AMB TEMPERATURE</p>
+        <span class="material-symbols-outlined text-secondary text-sm">thermostat</span>
+      </div>
+      <div class="flex items-baseline gap-1">
+        <input id="hist-temp" type="number" step="0.1" class="text-3xl font-bold text-primary bg-transparent border-none w-20 p-0 focus:outline-none focus:ring-0" onchange="saveEnvData()"/>
+        <span class="text-secondary text-sm uppercase">°C</span>
+      </div>
+    </div>
+    <div class="bg-surface-container-high p-5">
+      <div class="flex justify-between items-center mb-1">
+        <p class="uppercase tracking-[0.1em] text-[0.6rem] text-secondary">REL HUMIDITY</p>
+        <span class="material-symbols-outlined text-secondary text-sm">humidity_low</span>
+      </div>
+      <div class="flex items-baseline gap-1">
+        <input id="hist-humidity" type="number" step="1" class="text-3xl font-bold text-primary bg-transparent border-none w-16 p-0 focus:outline-none focus:ring-0" onchange="saveEnvData()"/>
+        <span class="text-secondary text-sm uppercase">%</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Drum Filter (dynamically generated) -->
+  <div id="hist-filter-bar" class="flex gap-2 mb-4 overflow-x-auto pb-1"></div>
+
+  <!-- Quick Stats (computed from real data) -->
+  <div class="grid grid-cols-2 gap-1 mb-6">
+    <div class="bg-surface-container-low p-4">
+      <p class="text-[9px] text-secondary uppercase tracking-[0.15em] mb-1">PEAK DECAY</p>
+      <p id="hist-peak-decay" class="text-lg font-bold text-primary">--</p>
+    </div>
+    <div class="bg-surface-container-low p-4">
+      <p class="text-[9px] text-secondary uppercase tracking-[0.15em] mb-1">SESSION COUNT</p>
+      <p id="hist-session-count" class="text-lg font-bold text-primary">0</p>
+    </div>
+    <div class="bg-surface-container-low p-4 border-l border-primary-container/20">
+      <p class="text-[9px] text-primary-container uppercase tracking-[0.15em] mb-1">TENSION STABILITY</p>
+      <p id="hist-stability" class="text-lg font-bold text-primary">--</p>
+    </div>
+    <div class="bg-surface-container-low p-4">
+      <p class="text-[9px] text-secondary uppercase tracking-[0.15em] mb-1">LAST CALIBRATION</p>
+      <p id="hist-last-cal" class="text-lg font-bold text-primary">--</p>
+    </div>
+  </div>
+
+  <!-- Session Log -->
+  <div>
+    <h3 class="uppercase tracking-[0.15em] text-[0.7rem] text-secondary mb-4 flex items-center gap-3">
+      RECENT SESSIONS <span class="h-[1px] flex-1 bg-outline-variant/20"></span>
+    </h3>
+    <div id="session-log" class="space-y-1"></div>
+  </div>
+</main>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- PAGE: RESONANCE                                    -->
+<!-- ═══════════════════════════════════════════════════ -->
+<main id="page-resonance" class="page flex-1 pt-14 pb-20 px-5 overflow-y-auto">
+  <button onclick="navigateTo('kit')" class="flex items-center gap-1 text-primary-container text-xs uppercase tracking-wider mt-3 mb-4 active:scale-95">
+    <span class="material-symbols-outlined text-sm">arrow_back</span> BACK TO KIT
+  </button>
+
+  <h2 class="text-xl font-bold tracking-tight mb-1">DRUM SOUND CHECK</h2>
+  <p class="text-[9px] text-outline uppercase tracking-wider mb-3">Strike the drum and see how it sounds</p>
+
+  <div id="resonance-head-toggle" class="max-w-md mx-auto"></div>
+
+  <!-- Tone Character Card -->
+  <div id="res-tone-card" class="bg-surface-container-low p-5 mb-3">
+    <div class="flex justify-between items-start mb-3">
+      <div>
+        <p class="text-[0.6rem] uppercase tracking-[0.1em] text-secondary">TONE CHARACTER</p>
+        <p id="res-tone-label" class="text-2xl font-bold text-primary mt-1">Strike to analyze</p>
+      </div>
+      <div id="res-tone-icon" class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center">
+        <span class="material-symbols-outlined text-secondary">mic</span>
+      </div>
+    </div>
+    <p id="res-tone-desc" class="text-[10px] text-outline leading-relaxed">Hit your drum with the mic on and we'll tell you how it sounds.</p>
+  </div>
+
+  <!-- Head Relationship Card -->
+  <div class="bg-surface-container-low p-5 mb-3">
+    <p class="text-[0.6rem] uppercase tracking-[0.1em] text-secondary mb-3">BATTER / RESONANT RELATIONSHIP</p>
+    <div class="flex items-center gap-3 mb-3">
+      <div class="flex-1 text-center">
+        <p class="text-[8px] uppercase text-secondary tracking-wider">BATTER</p>
+        <p id="res-batter-freq" class="text-lg font-bold text-primary">--</p>
+        <p id="res-batter-note" class="text-[9px] text-primary-container/60">--</p>
+      </div>
+      <div class="flex flex-col items-center gap-1">
+        <span id="res-rel-arrow" class="text-primary-container text-lg">↕</span>
+        <span id="res-rel-pct" class="text-[9px] font-mono text-primary-container font-bold">--</span>
+      </div>
+      <div class="flex-1 text-center">
+        <p class="text-[8px] uppercase text-secondary tracking-wider">RESONANT</p>
+        <p id="res-reso-freq" class="text-lg font-bold text-primary">--</p>
+        <p id="res-reso-note" class="text-[9px] text-primary-container/60">--</p>
+      </div>
+    </div>
+    <div id="res-rel-effect" class="bg-surface-container-high p-3">
+      <p id="res-rel-text" class="text-[10px] text-secondary leading-relaxed">Select a drum to see how the head relationship affects its sound.</p>
+    </div>
+  </div>
+
+  <!-- Ring / Sustain Assessment -->
+  <div class="bg-surface-container-low p-5 mb-3">
+    <div class="flex justify-between items-start mb-2">
+      <p class="text-[0.6rem] uppercase tracking-[0.1em] text-secondary">RING / SUSTAIN</p>
+      <span id="res-ring-label" class="text-primary-container font-bold text-sm">--</span>
+    </div>
+    <div class="relative h-3 bg-surface-container-highest mb-2 overflow-hidden">
+      <div class="absolute inset-0 flex">
+        <div class="flex-1 border-r border-surface-container-low/50" title="Short"></div>
+        <div class="flex-1 border-r border-surface-container-low/50" title="Medium"></div>
+        <div class="flex-1" title="Long"></div>
+      </div>
+      <div id="res-ring-bar" class="absolute left-0 top-0 h-full bg-primary-container/60 transition-all" style="width: 0%"></div>
+    </div>
+    <div class="flex justify-between text-[8px] text-outline uppercase">
+      <span>Short / Dry</span><span>Medium</span><span>Long / Ringy</span>
+    </div>
+    <p id="res-ring-advice" class="text-[10px] text-secondary mt-3 leading-relaxed">Strike the drum to measure sustain.</p>
+  </div>
+
+  <!-- Live Spectrum -->
+  <div class="bg-surface-container-low p-4 mb-3">
+    <div class="flex justify-between items-center mb-2">
+      <p class="text-[0.6rem] uppercase tracking-[0.1em] text-secondary">LIVE SPECTRUM</p>
+      <span id="res-freq" class="font-mono text-xs text-primary-container">-- Hz</span>
+    </div>
+    <div class="relative h-36 w-full overflow-hidden">
+      <canvas id="resonance-spectrum" class="absolute inset-0 w-full h-full" width="400" height="144"></canvas>
+    </div>
+    <p class="text-[8px] text-outline mt-1">Shows all frequencies your drum is producing. Tall spikes = strong frequencies.</p>
+  </div>
+
+  <!-- Problem Overtones (hidden until analyzed) -->
+  <div id="res-overtone-result" class="bg-surface-container-low p-5 mb-3 hidden">
+    <p class="text-[0.6rem] uppercase tracking-[0.1em] text-secondary mb-3">OVERTONE CHECK</p>
+    <div id="res-harmonics-list" class="space-y-2"></div>
+  </div>
+
+  <!-- Analyze Button -->
+  <button onclick="analyzeOvertones()" class="w-full py-4 bg-primary-container text-on-primary font-bold uppercase tracking-[0.15em] text-sm flex items-center justify-center gap-3 hover:shadow-[0_0_15px_#00F5FF] transition-all active:scale-[0.98] mb-3">
+    <span class="material-symbols-outlined">mic</span> STRIKE &amp; ANALYZE
+  </button>
+  <p class="text-[8px] text-outline text-center mb-4">Start the mic on the Tuner page, then come here and strike the drum</p>
+
+  <!-- Hidden elements for compat -->
+  <input type="hidden" id="res-gate" value="-24"/>
+</main>
+
+<!-- ═══════ BOTTOM NAV ═══════ -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-[env(safe-area-inset-bottom,6px)] pt-2 bg-[#0b1326]/70 backdrop-blur-xl border-t border-[#3a494a]/15 shadow-[0_-8px_32px_rgba(11,19,38,0.4)] z-50" style="padding-bottom: max(env(safe-area-inset-bottom), 12px);">
+  <a class="nav-item active-nav flex flex-col items-center justify-center cursor-pointer active:scale-90 duration-200 py-1" data-nav="tuner" onclick="navigateTo('tuner')">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="7" y1="4" x2="17" y2="4"/>
+      <line x1="12" y1="4" x2="12" y2="16"/>
+      <rect x="9.5" y="16" width="5" height="5" rx="0.5"/>
+      <rect x="10.8" y="17.3" width="2.4" height="2.4" rx="0.3" stroke-width="1.2"/>
+    </svg>
+    <span class="uppercase tracking-[0.1em] text-[10px] mt-0.5">TUNER</span>
+  </a>
+  <a class="nav-item flex flex-col items-center justify-center cursor-pointer active:scale-90 duration-200 py-1" data-nav="kit" onclick="navigateTo('kit')">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <!-- Bass drum (large circle) -->
+      <ellipse cx="12" cy="15" rx="7" ry="6"/>
+      <!-- Snare/tom (smaller drum on top left) -->
+      <ellipse cx="7" cy="8" rx="4" ry="2.5"/>
+      <!-- Tom on top right -->
+      <ellipse cx="17" cy="8" rx="4" ry="2.5"/>
+      <!-- Hi-hat/cymbal line -->
+      <line x1="2" y1="4" x2="6" y2="4" stroke-width="1.8"/>
+      <line x1="4" y1="4" x2="4" y2="8"/>
+    </svg>
+    <span class="uppercase tracking-[0.1em] text-[10px] mt-0.5">KIT</span>
+  </a>
+  <a class="nav-item flex flex-col items-center justify-center cursor-pointer active:scale-90 duration-200 py-1" data-nav="presets" onclick="navigateTo('presets')">
+    <span class="material-symbols-outlined text-xl">list_alt</span>
+    <span class="uppercase tracking-[0.1em] text-[10px] mt-0.5">PRESETS</span>
+  </a>
+  <a class="nav-item flex flex-col items-center justify-center cursor-pointer active:scale-90 duration-200 py-1" data-nav="history" onclick="navigateTo('history')">
+    <span class="material-symbols-outlined text-xl">history</span>
+    <span class="uppercase tracking-[0.1em] text-[10px] mt-0.5">HISTORY</span>
+  </a>
+</nav>
+
+<!-- ═══════ CREATE PRESET MODAL ═══════ -->
+<div id="preset-modal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/60 backdrop-blur-sm">
+  <div class="bg-surface-container-low p-6 w-[90%] max-w-sm">
+    <h3 class="text-lg font-bold mb-4 text-primary">CREATE PRESET</h3>
+    <div class="space-y-3">
+      <div>
+        <label class="text-[0.6rem] uppercase tracking-[0.1em] text-secondary block mb-1">Preset Name</label>
+        <input id="preset-name" type="text" class="w-full bg-surface-container-lowest border-none py-2 px-3 text-primary text-sm focus:outline-none focus:ring-1 focus:ring-primary-container"/>
+      </div>
+      <div>
+        <label class="text-[0.6rem] uppercase tracking-[0.1em] text-secondary block mb-1">Genre / Style</label>
+        <input id="preset-genre" type="text" class="w-full bg-surface-container-lowest border-none py-2 px-3 text-primary text-sm focus:outline-none focus:ring-1 focus:ring-primary-container"/>
+      </div>
+      <div>
+        <label class="text-[0.6rem] uppercase tracking-[0.1em] text-secondary block mb-1">Calibration (Hz)</label>
+        <input id="preset-cal" type="number" value="440" class="w-full bg-surface-container-lowest border-none py-2 px-3 text-primary text-sm focus:outline-none focus:ring-1 focus:ring-primary-container"/>
+      </div>
+      <!-- Source toggle -->
+      <div>
+        <label class="text-[0.6rem] uppercase tracking-[0.1em] text-secondary block mb-1">Save From</label>
+        <div class="flex gap-2">
+          <button id="preset-src-targets" onclick="setPresetSource('targets')" class="flex-1 py-1.5 bg-primary-container text-on-primary font-bold text-[9px] uppercase tracking-wider active:scale-95">Targets</button>
+          <button id="preset-src-measured" onclick="setPresetSource('measured')" class="flex-1 py-1.5 bg-surface-container-high text-secondary font-bold text-[9px] uppercase tracking-wider active:scale-95">Measurements</button>
+        </div>
+      </div>
+      <!-- Per-drum frequency editors -->
+      <div>
+        <label class="text-[0.6rem] uppercase tracking-[0.1em] text-secondary block mb-1">Drum Frequencies (Hz)</label>
+        <div id="preset-drum-fields" class="grid grid-cols-2 gap-2"></div>
+      </div>
+    </div>
+    <div class="flex gap-2 mt-5">
+      <button onclick="closePresetModal()" class="flex-1 py-2 bg-surface-container-high text-secondary text-[10px] uppercase tracking-wider font-bold active:scale-95">CANCEL</button>
+      <button onclick="saveNewPreset()" class="flex-1 py-2 bg-primary-container text-on-primary text-[10px] uppercase tracking-wider font-bold active:scale-95">SAVE</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ SETTINGS MODAL ═══════ -->
+<div id="settings-modal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/60 backdrop-blur-sm">
+  <div class="bg-surface-container-low w-[92%] max-w-md max-h-[85vh] overflow-y-auto">
+    <!-- Header -->
+    <div class="flex justify-between items-center p-5 pb-3 border-b border-outline-variant/15">
+      <h3 class="text-lg font-bold text-primary uppercase tracking-wider">Settings</h3>
+      <span class="material-symbols-outlined text-secondary hover:text-primary cursor-pointer text-xl" onclick="closeSettings()">close</span>
+    </div>
+    <div class="p-5 space-y-5">
+
+      <!-- Sensitivity Mode -->
+      <div>
+        <p class="uppercase tracking-[0.1em] text-[0.6rem] text-secondary mb-3">SENSITIVITY MODE</p>
+        <div class="flex gap-2">
+          <button id="settings-btn-lab" onclick="setSensitivity('lab')" class="flex-1 py-2 bg-primary-container text-on-primary font-bold text-[10px] uppercase tracking-wider active:scale-95 duration-100">Laboratory</button>
+          <button id="settings-btn-stage" onclick="setSensitivity('stage')" class="flex-1 py-2 bg-surface-container-high text-secondary font-bold text-[10px] uppercase tracking-wider hover:text-primary transition-colors active:scale-95 duration-100">Stage</button>
+        </div>
+        <p id="settings-sensitivity-desc" class="text-[10px] text-outline mt-3 leading-relaxed">High-precision mode optimized for isolated acoustic environments.</p>
+      </div>
+
+      <div class="h-px bg-outline-variant/15"></div>
+
+      <!-- Reference Pitch -->
+      <div>
+        <p class="uppercase tracking-[0.1em] text-[0.6rem] text-secondary mb-3">REFERENCE PITCH (A4)</p>
+        <div class="flex items-center gap-3">
+          <button onclick="adjustRefPitch(-1)" class="w-9 h-9 bg-surface-container-high text-secondary hover:text-primary flex items-center justify-center active:scale-90 transition-all">
+            <span class="material-symbols-outlined text-lg">remove</span>
+          </button>
+          <input id="settings-ref-pitch" type="number" min="400" max="480" step="1" value="440" class="w-20 bg-surface-container-lowest border-none py-2 text-center text-primary text-lg font-bold font-headline focus:outline-none focus:ring-1 focus:ring-primary-container" onchange="setRefPitch(this.value)"/>
+          <span class="text-secondary text-xs">Hz</span>
+          <button onclick="adjustRefPitch(1)" class="w-9 h-9 bg-surface-container-high text-secondary hover:text-primary flex items-center justify-center active:scale-90 transition-all">
+            <span class="material-symbols-outlined text-lg">add</span>
+          </button>
+          <button onclick="setRefPitch(440)" class="ml-auto text-[9px] uppercase tracking-wider text-secondary hover:text-primary-container transition-colors px-2 py-1 bg-surface-container-high active:scale-95">Reset</button>
+        </div>
+        <p class="text-[10px] text-outline mt-2 leading-relaxed">Standard concert pitch is 440 Hz. Adjust for alternate tuning references.</p>
+      </div>
+
+      <div class="h-px bg-outline-variant/15"></div>
+
+      <!-- Audio Info -->
+      <div>
+        <p class="uppercase tracking-[0.1em] text-[0.6rem] text-secondary mb-3">AUDIO ENGINE</p>
+        <div class="grid grid-cols-2 gap-2">
+          <div class="bg-surface-container-high p-3">
+            <p class="text-[9px] uppercase tracking-wider text-secondary mb-0.5">SAMPLE RATE</p>
+            <p id="settings-sr" class="text-sm font-bold text-primary font-mono">--</p>
+          </div>
+          <div class="bg-surface-container-high p-3">
+            <p class="text-[9px] uppercase tracking-wider text-secondary mb-0.5">LATENCY</p>
+            <p id="settings-latency" class="text-sm font-bold text-primary font-mono">--</p>
+          </div>
+          <div class="bg-surface-container-high p-3">
+            <p class="text-[9px] uppercase tracking-wider text-secondary mb-0.5">FFT SIZE</p>
+            <p id="settings-fft" class="text-sm font-bold text-primary font-mono">--</p>
+          </div>
+          <div class="bg-surface-container-high p-3">
+            <p class="text-[9px] uppercase tracking-wider text-secondary mb-0.5">INPUT DEVICE</p>
+            <p id="settings-device" class="text-sm font-bold text-primary font-mono truncate">--</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="h-px bg-outline-variant/15"></div>
+
+      <!-- Data Management -->
+      <div>
+        <p class="uppercase tracking-[0.1em] text-[0.6rem] text-secondary mb-3">DATA MANAGEMENT</p>
+        <div class="space-y-2">
+          <button onclick="clearSessionHistory()" class="w-full py-2.5 bg-surface-container-high text-secondary hover:text-primary text-[10px] uppercase tracking-wider font-bold flex items-center justify-center gap-2 active:scale-95 transition-colors">
+            <span class="material-symbols-outlined text-sm">delete_sweep</span> CLEAR SESSION HISTORY
+          </button>
+          <button onclick="resetAllLugReadings()" class="w-full py-2.5 bg-surface-container-high text-secondary hover:text-primary text-[10px] uppercase tracking-wider font-bold flex items-center justify-center gap-2 active:scale-95 transition-colors">
+            <span class="material-symbols-outlined text-sm">restart_alt</span> RESET ALL LUG READINGS
+          </button>
+          <button onclick="confirmFactoryReset()" class="w-full py-2.5 bg-error-container/30 text-error/80 hover:text-error text-[10px] uppercase tracking-wider font-bold flex items-center justify-center gap-2 active:scale-95 transition-colors">
+            <span class="material-symbols-outlined text-sm">warning</span> FACTORY RESET
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Background atmosphere -->
+<div class="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
+  <div class="absolute inset-0 opacity-[0.03]" style="background-image: radial-gradient(#00F5FF 0.5px, transparent 0.5px); background-size: 24px 24px;"></div>
+  <div class="absolute -top-1/4 -left-1/4 w-1/2 h-1/2 bg-primary-container/5 blur-[120px] rounded-full"></div>
+  <div class="absolute -bottom-1/4 -right-1/4 w-1/2 h-1/2 bg-surface-container-high/20 blur-[120px] rounded-full"></div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════
+// S2: EVENT BUS — Simple pub/sub for cross-page comms
+// ══════════════════════════════════════════════════════
+const EventBus = (() => {
+  const listeners = {};
+  return {
+    on(event, cb) {
+      if (!listeners[event]) listeners[event] = [];
+      listeners[event].push(cb);
+      return () => { listeners[event] = listeners[event].filter(fn => fn !== cb); };
+    },
+    emit(event, data) {
+      (listeners[event] || []).forEach(cb => { try { cb(data); } catch(e) { console.error(`EventBus [${event}]:`, e); } });
+    }
+  };
+})();
+
+// ══════════════════════════════════════════════════════
+// S1 + S3: CENTRALIZED APP STATE with localStorage
+// ══════════════════════════════════════════════════════
+const _head = () => ({ targetFreq: 100, measuredFreq: null, lastTuned: null, lugReadings: [] });
+// Default kit: best-practice "Standard" tuning
+// Toms: resonant ~6-8% higher — musical pitch-bend down, good sustain
+// Snare: resonant (snare-side) ~1.65x batter — crisp snare wire response
+// Bass: resonant slightly lower — ported front head, punchy attack
+const DEFAULT_DRUM_KIT = {
+  'BASS':     { size: 22, lugs: 8,  batter: { ..._head(), targetFreq: 55 },  resonant: { ..._head(), targetFreq: 49 } },  // A1 / G1
+  'SNARE':    { size: 14, lugs: 10, batter: { ..._head(), targetFreq: 200 }, resonant: { ..._head(), targetFreq: 330 } },  // G3 / E4
+  'HIGH TOM': { size: 10, lugs: 6,  batter: { ..._head(), targetFreq: 185 }, resonant: { ..._head(), targetFreq: 196 } },  // F#3 / G3
+  'MID TOM':  { size: 12, lugs: 6,  batter: { ..._head(), targetFreq: 147 }, resonant: { ..._head(), targetFreq: 156 } },  // D3 / D#3
+  'FLOOR 1':  { size: 14, lugs: 8,  batter: { ..._head(), targetFreq: 110 }, resonant: { ..._head(), targetFreq: 117 } },  // A2 / A#2
+  'FLOOR 2':  { size: 16, lugs: 8,  batter: { ..._head(), targetFreq: 87 },  resonant: { ..._head(), targetFreq: 92 } },   // F2 / F#2
+};
+
+const AppState = {
+  // Current UI state
+  currentPage: 'tuner',
+  selectedDrum: 'SNARE',
+  activeHead: 'batter', // 'batter' | 'resonant'
+  sensitivity: 'lab',
+  activePreset: null,
+
+  // Live audio state (not persisted)
+  micActive: false,
+  currentFreq: null,
+  currentNote: null,
+  currentRMS: -Infinity,
+  currentDb: -Infinity,
+
+  // Strike detection state
+  lastStrikeTime: 0,
+  lastStrikeFreq: null,
+  lastDecayMs: null,
+  pitchBuffer: [],
+  pitchStable: false,
+
+  // Lug measurement state
+  activeLugIndex: 0,
+  lugMeasuring: false,
+
+  // Drum kit — persisted
+  drumKit: {},
+
+  // Migrate old flat drum format to batter/resonant
+  _migrateDrum(data) {
+    if (data.batter && data.resonant) return data; // already new format
+    const batFreq = data.targetFreq || 100;
+    return {
+      size: data.size || 12,
+      lugs: data.lugs || 6,
+      batter: {
+        targetFreq: batFreq,
+        measuredFreq: data.measuredFreq || null,
+        lastTuned: data.lastTuned || null,
+        lugReadings: Array.isArray(data.lugReadings) ? data.lugReadings : []
+      },
+      resonant: {
+        targetFreq: Math.round(batFreq * 1.07), // resonant ~7% higher (toms/bass default)
+        measuredFreq: null,
+        lastTuned: null,
+        lugReadings: []
+      }
+    };
+  },
+
+  init() {
+    const KIT_VERSION = 3; // bump when DEFAULT_DRUM_KIT changes
+    const storedVer = parseInt(localStorage.getItem('sp_drumkit_ver') || '0');
+    const stored = localStorage.getItem('sp_drumkit');
+
+    if (stored && storedVer >= KIT_VERSION) {
+      try {
+        const parsed = JSON.parse(stored);
+        this.drumKit = {};
+        for (const [name, data] of Object.entries(parsed)) {
+          this.drumKit[name] = this._migrateDrum(data);
+          ['batter', 'resonant'].forEach(h => {
+            if (!this.drumKit[name][h]) this.drumKit[name][h] = { targetFreq: 100, measuredFreq: null, lastTuned: null, lugReadings: [] };
+            if (!Array.isArray(this.drumKit[name][h].lugReadings)) this.drumKit[name][h].lugReadings = [];
+          });
+          if (!this.drumKit[name].size) this.drumKit[name].size = 12;
+        }
+        for (const [name, defaults] of Object.entries(DEFAULT_DRUM_KIT)) {
+          if (!this.drumKit[name]) this.drumKit[name] = JSON.parse(JSON.stringify(defaults));
+        }
+      } catch(e) {
+        this.drumKit = JSON.parse(JSON.stringify(DEFAULT_DRUM_KIT));
+      }
+    } else {
+      // Stale or missing — start fresh with defaults
+      // Preserve user-added drums (names not in defaults) if upgrading
+      let userDrums = {};
+      if (stored) {
+        try {
+          const old = JSON.parse(stored);
+          for (const [name, data] of Object.entries(old)) {
+            if (!DEFAULT_DRUM_KIT[name]) userDrums[name] = this._migrateDrum(data);
+          }
+        } catch(e) {}
+      }
+      this.drumKit = JSON.parse(JSON.stringify(DEFAULT_DRUM_KIT));
+      Object.assign(this.drumKit, userDrums);
+    }
+    localStorage.setItem('sp_drumkit_ver', String(KIT_VERSION));
+    this.persistKit();
+  },
+
+  persistKit() {
+    localStorage.setItem('sp_drumkit', JSON.stringify(this.drumKit));
+  },
+
+  getDrum(name) {
+    return this.drumKit[name || this.selectedDrum];
+  },
+
+  // Get the active head sub-object for a drum
+  getHead(name) {
+    const drum = this.getDrum(name);
+    return drum ? drum[this.activeHead] : null;
+  },
+
+  // Get a specific head regardless of activeHead
+  getHeadOf(name, head) {
+    const drum = this.getDrum(name);
+    return drum ? drum[head] : null;
+  },
+
+  setSelectedDrum(name) {
+    this.selectedDrum = name;
+    EventBus.emit('drum-selected', name);
+  },
+
+  setActiveHead(head) {
+    this.activeHead = head;
+    EventBus.emit('head-changed', head);
+  },
+
+  setMeasuredFreq(drumName, freq) {
+    const head = this.getHead(drumName);
+    if (!head) return;
+    head.measuredFreq = freq;
+    head.lastTuned = new Date().toISOString();
+    this.persistKit();
+    EventBus.emit('drum-measured', { drum: drumName, head: this.activeHead, freq });
+  },
+
+  setLugReading(drumName, lugIndex, reading) {
+    const head = this.getHead(drumName);
+    if (!head) return;
+    if (!Array.isArray(head.lugReadings)) head.lugReadings = [];
+    head.lugReadings[lugIndex] = reading;
+    this.persistKit();
+    EventBus.emit('lug-measured', { drum: drumName, lugIndex, reading });
+  },
+
+  addDrum(name, data) {
+    const batFreq = (data && data.targetFreq) || 100;
+    this.drumKit[name] = {
+      size: (data && data.size) || 12,
+      lugs: (data && data.lugs) || 6,
+      batter:   { targetFreq: batFreq, measuredFreq: null, lastTuned: null, lugReadings: [] },
+      resonant: { targetFreq: Math.round(batFreq * 1.07), measuredFreq: null, lastTuned: null, lugReadings: [] },
+    };
+    this.persistKit();
+    EventBus.emit('kit-changed');
+  },
+
+  removeDrum(name) {
+    delete this.drumKit[name];
+    if (this.selectedDrum === name) {
+      this.selectedDrum = Object.keys(this.drumKit)[0] || 'SNARE';
+    }
+    this.persistKit();
+    EventBus.emit('kit-changed');
+  },
+
+  clearLugReadings(drumName) {
+    const head = this.getHead(drumName);
+    if (!head) return;
+    head.lugReadings = [];
+    this.persistKit();
+    EventBus.emit('lugs-reset', drumName);
+  },
+
+  // Accept either { SNARE: { batter: 228, resonant: 215 } } or legacy { SNARE: 228 }
+  updateTargetFreqs(drumFreqs) {
+    for (const [name, val] of Object.entries(drumFreqs)) {
+      const drum = this.drumKit[name];
+      if (!drum) continue;
+      if (typeof val === 'object' && val.batter != null) {
+        drum.batter.targetFreq = val.batter;
+        drum.resonant.targetFreq = val.resonant;
+      } else {
+        // Legacy: plain number = batter, derive resonant
+        drum.batter.targetFreq = val;
+        drum.resonant.targetFreq = Math.round(val * 0.95);
+      }
+    }
+    this.persistKit();
+    EventBus.emit('targets-updated', drumFreqs);
+  },
+
+  addPitchReading(freq) {
+    this.currentFreq = freq;
+    this.pitchBuffer.push(freq);
+    if (this.pitchBuffer.length > 15) this.pitchBuffer.shift();
+    if (this.pitchBuffer.length >= 5) {
+      const mean = this.pitchBuffer.reduce((a, b) => a + b, 0) / this.pitchBuffer.length;
+      const variance = this.pitchBuffer.reduce((s, v) => s + (v - mean) ** 2, 0) / this.pitchBuffer.length;
+      this.pitchStable = Math.sqrt(variance) < 2.0;
+    } else {
+      this.pitchStable = false;
+    }
+  },
+
+  clearPitchBuffer() {
+    this.pitchBuffer = [];
+    this.pitchStable = false;
+    this.currentFreq = null;
+    this.currentNote = null;
+  }
+};
+
+// Global head toggle function
+function setActiveHead(head) {
+  AppState.setActiveHead(head);
+  // Update all head toggle buttons across pages
+  document.querySelectorAll('.head-toggle-btn').forEach(btn => {
+    const isActive = btn.dataset.head === head;
+    btn.className = 'head-toggle-btn flex-1 py-1.5 font-bold text-[10px] uppercase tracking-wider active:scale-95 duration-100 ' +
+      (isActive ? 'bg-primary-container text-on-primary' : 'bg-surface-container-high text-secondary hover:text-primary transition-colors');
+  });
+}
+
+// Reusable head toggle HTML generator
+function headToggleHTML() {
+  const b = AppState.activeHead === 'batter';
+  return `<div class="relative flex my-3 bg-surface-container-high/80 rounded-full p-1.5 backdrop-blur-sm border border-outline-variant/10">
+    <div class="absolute top-1.5 bottom-1.5 rounded-full bg-primary-container shadow-[0_0_12px_rgba(0,245,255,0.25)] transition-all duration-300 ease-out" style="width:calc(50% - 6px);${b ? 'left:6px' : 'left:calc(50%)'}"></div>
+    <button class="head-toggle-btn relative z-10 flex-1 py-2.5 px-6 font-bold text-[11px] uppercase tracking-[0.15em] rounded-full transition-colors duration-300 ${b ? 'text-on-primary' : 'text-secondary hover:text-primary/80'}" data-head="batter" onclick="setActiveHead('batter')">Batter</button>
+    <button class="head-toggle-btn relative z-10 flex-1 py-2.5 px-6 font-bold text-[11px] uppercase tracking-[0.15em] rounded-full transition-colors duration-300 ${!b ? 'text-on-primary' : 'text-secondary hover:text-primary/80'}" data-head="resonant" onclick="setActiveHead('resonant')">Resonant</button>
+  </div>`;
+}
+
+// Freq-to-note lookup
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+function hzToNote(hz) {
+  if (!hz || hz < 20) return '';
+  const midi = 69 + 12 * Math.log2(hz / (AppState.referencePitch || 440));
+  const rounded = Math.round(midi);
+  const octave = Math.floor(rounded / 12) - 1;
+  return NOTE_NAMES[((rounded % 12) + 12) % 12] + octave;
+}
+
+// Default presets — research-based best practice tuning frequencies
+// Sources: Rob Brown Drum Tuning Bible, DrumDial references, professional drum tech intervals
+// Assumes single-ply coated batter, single-ply clear resonant
+const defaultPresets = [
+  {
+    name: 'STANDARD', genre: 'General Purpose / Versatile', cal: 440,
+    desc: 'Medium tension, musical 4ths between toms. Resonant slightly higher for pleasant pitch-bend down and sustain. The universal starting point.',
+    headRel: 'Resonant ~6-8% higher — musical pitch-bend, good sustain',
+    drums: {
+      'BASS':     {batter:55, resonant:49},    // A1 / G1 — bass reso lower (ported)
+      'SNARE':    {batter:200,resonant:330},    // G3 / E4 — snare-side high for wire response
+      'HIGH TOM': {batter:185,resonant:196},    // F#3 / G3
+      'MID TOM':  {batter:147,resonant:156},    // D3 / D#3
+      'FLOOR 1':  {batter:110,resonant:117},    // A2 / A#2
+      'FLOOR 2':  {batter:87, resonant:92}      // F2 / F#2
+    }
+  },
+  {
+    name: 'ROCK', genre: 'Punchy / Medium-High Tension', cal: 440,
+    desc: 'Attack-forward with controlled sustain. Resonant lower than batter for punch and downward pitch bend.',
+    headRel: 'Resonant ~12% lower — punch, attack definition',
+    drums: {
+      'BASS':     {batter:60, resonant:52},    // B1 / G#1
+      'SNARE':    {batter:220,resonant:350},    // A3 / F4
+      'HIGH TOM': {batter:196,resonant:175},    // G3 / F3
+      'MID TOM':  {batter:156,resonant:139},    // D#3 / C#3
+      'FLOOR 1':  {batter:117,resonant:104},    // A#2 / G#2
+      'FLOOR 2':  {batter:92, resonant:82}      // F#2 / E2
+    }
+  },
+  {
+    name: 'JAZZ', genre: 'High Tension / Bright / Responsive', cal: 440,
+    desc: 'High tuning for maximum tone and projection. Resonant higher than batter for singing sustain. Tight 3rd intervals between toms.',
+    headRel: 'Resonant ~12% higher — singing sustain, pitch-up bend',
+    drums: {
+      'BASS':     {batter:73, resonant:78},    // D2 / D#2
+      'SNARE':    {batter:262,resonant:392},    // C4 / G4
+      'HIGH TOM': {batter:247,resonant:277},    // B3 / C#4
+      'MID TOM':  {batter:208,resonant:233},    // G#3 / A#3
+      'FLOOR 1':  {batter:165,resonant:185},    // E3 / F#3
+      'FLOOR 2':  {batter:131,resonant:147}     // C3 / D3
+    }
+  },
+  {
+    name: 'METAL', genre: 'Very High Tension / Attack-Focused', cal: 440,
+    desc: 'Maximum attack and articulation. Very tight heads for fast rebound. Resonant significantly lower for short, punchy decay.',
+    headRel: 'Resonant ~16% lower — very short sustain, max attack',
+    drums: {
+      'BASS':     {batter:65, resonant:55},    // C2 / A1
+      'SNARE':    {batter:311,resonant:440},    // D#4 / A4
+      'HIGH TOM': {batter:233,resonant:196},    // A#3 / G3
+      'MID TOM':  {batter:185,resonant:156},    // F#3 / D#3
+      'FLOOR 1':  {batter:139,resonant:117},    // C#3 / A#2
+      'FLOOR 2':  {batter:110,resonant:92}      // A2 / F#2
+    }
+  },
+  {
+    name: 'FUNK / R&B', genre: 'Tight / Controlled / Dry', cal: 440,
+    desc: 'Short sustain, maximum control. Designed for groove-focused playing with minimal ring and tight note definition.',
+    headRel: 'Resonant ~16% lower — very dry, controlled sound',
+    drums: {
+      'BASS':     {batter:62, resonant:52},    // B1 / G#1
+      'SNARE':    {batter:247,resonant:370},    // B3 / F#4
+      'HIGH TOM': {batter:208,resonant:175},    // G#3 / F3
+      'MID TOM':  {batter:165,resonant:139},    // E3 / C#3
+      'FLOOR 1':  {batter:123,resonant:104},    // B2 / G#2
+      'FLOOR 2':  {batter:98, resonant:82}      // G2 / E2
+    }
+  },
+  {
+    name: 'BLUES / CLASSIC ROCK', genre: 'Low-Medium / Open / Warm', cal: 440,
+    desc: 'Warm, open tuning with long sustain and full body. Resonant slightly higher for bloom and singing tone. Think Bonham, Mitch Mitchell.',
+    headRel: 'Resonant ~6% higher — warm sustain, tonal bloom',
+    drums: {
+      'BASS':     {batter:52, resonant:55},    // G#1 / A1
+      'SNARE':    {batter:185,resonant:294},    // F#3 / D4
+      'HIGH TOM': {batter:165,resonant:175},    // E3 / F3
+      'MID TOM':  {batter:131,resonant:139},    // C3 / C#3
+      'FLOOR 1':  {batter:98, resonant:104},    // G2 / G#2
+      'FLOOR 2':  {batter:78, resonant:82}      // D#2 / E2
+    }
+  },
+  {
+    name: 'STUDIO / RECORDING', genre: 'Balanced / Clean Fundamentals', cal: 440,
+    desc: 'Optimized for close-mic recording. Equal heads give the cleanest fundamental with predictable overtones. Easy to EQ and mix.',
+    headRel: 'Equal — cleanest fundamental, most predictable for mics',
+    drums: {
+      'BASS':     {batter:55, resonant:49},    // A1 / G1 — bass reso lower (ported)
+      'SNARE':    {batter:208,resonant:340},    // G#3 / F4
+      'HIGH TOM': {batter:175,resonant:175},    // F3 / F3 — equal for pure tone
+      'MID TOM':  {batter:139,resonant:139},    // C#3 / C#3
+      'FLOOR 1':  {batter:104,resonant:104},    // G#2 / G#2
+      'FLOOR 2':  {batter:82, resonant:82}      // E2 / E2
+    }
+  },
+  {
+    name: 'VINTAGE / MOELLER', genre: 'Low / Boomy / Wide Open', cal: 440,
+    desc: 'Vintage low tuning for maximum boom and resonance. Calfskin-era aesthetic. Long, singing decay with no muffling.',
+    headRel: 'Resonant ~12% higher — maximum bloom, singing character',
+    drums: {
+      'BASS':     {batter:46, resonant:49},    // F#1 / G1
+      'SNARE':    {batter:165,resonant:262},    // E3 / C4
+      'HIGH TOM': {batter:147,resonant:165},    // D3 / E3
+      'MID TOM':  {batter:117,resonant:131},    // A#2 / C3
+      'FLOOR 1':  {batter:87, resonant:98},     // F2 / G2
+      'FLOOR 2':  {batter:69, resonant:78}      // C#2 / D#2
+    }
+  },
+  {
+    name: 'POP / TOP 40', genre: 'Medium / Controlled / Polished', cal: 440,
+    desc: 'Clean, controlled sound designed for modern pop production. Moderate sustain, even response across the kit. Sits well in a dense mix.',
+    headRel: 'Resonant ~5% higher — controlled sustain, polished tone',
+    drums: {
+      'BASS':     {batter:58, resonant:52},    // A#1 / G#1
+      'SNARE':    {batter:220,resonant:349},    // A3 / F4
+      'HIGH TOM': {batter:196,resonant:208},    // G3 / G#3
+      'MID TOM':  {batter:156,resonant:165},    // D#3 / E3
+      'FLOOR 1':  {batter:117,resonant:123},    // A#2 / B2
+      'FLOOR 2':  {batter:92, resonant:98}      // F#2 / G2
+    }
+  },
+  {
+    name: 'GOSPEL', genre: 'High Tension / Powerful / Expressive', cal: 440,
+    desc: 'High tuning for projection and expressiveness. Big, open snare crack. Toms tuned high for melodic fills. Resonant higher for full sustain.',
+    headRel: 'Resonant ~10% higher — powerful sustain, expressive tone',
+    drums: {
+      'BASS':     {batter:65, resonant:62},    // C2 / B1
+      'SNARE':    {batter:277,resonant:415},    // C#4 / G#4
+      'HIGH TOM': {batter:233,resonant:262},    // A#3 / C4
+      'MID TOM':  {batter:196,resonant:220},    // G3 / A3
+      'FLOOR 1':  {batter:147,resonant:165},    // D3 / E3
+      'FLOOR 2':  {batter:117,resonant:131}     // A#2 / C3
+    }
+  },
+  {
+    name: 'REGGAE / DUB', genre: 'Very Low / Deep / Spacious', cal: 440,
+    desc: 'Very low tuning for deep, spacious sound. Heavy bass drum emphasis. Lots of room for reverb and delay effects. Minimal overtones.',
+    headRel: 'Resonant ~8% higher — deep sustain, warm decay',
+    drums: {
+      'BASS':     {batter:46, resonant:44},    // F#1 / F1 — very deep
+      'SNARE':    {batter:175,resonant:277},    // F3 / C#4 — cross-stick friendly
+      'HIGH TOM': {batter:147,resonant:156},    // D3 / D#3
+      'MID TOM':  {batter:117,resonant:123},    // A#2 / B2
+      'FLOOR 1':  {batter:87, resonant:92},     // F2 / F#2
+      'FLOOR 2':  {batter:69, resonant:73}      // C#2 / D2
+    }
+  },
+  {
+    name: 'COUNTRY / NASHVILLE', genre: 'Medium-High / Bright / Defined', cal: 440,
+    desc: 'Bright, well-defined tuning that cuts through a band mix. Snare crack is prominent. Toms have clear pitch for fills. Nashville studio standard.',
+    headRel: 'Resonant ~8% higher — clear pitch, bright sustain',
+    drums: {
+      'BASS':     {batter:60, resonant:55},    // B1 / A1
+      'SNARE':    {batter:233,resonant:370},    // A#3 / F#4
+      'HIGH TOM': {batter:208,resonant:220},    // G#3 / A3
+      'MID TOM':  {batter:165,resonant:175},    // E3 / F3
+      'FLOOR 1':  {batter:123,resonant:131},    // B2 / C3
+      'FLOOR 2':  {batter:98, resonant:104}     // G2 / G#2
+    }
+  },
+  {
+    name: 'PROG ROCK', genre: 'Medium-High / Wide Range / Melodic', cal: 440,
+    desc: 'Wide pitch range between toms for melodic passages. Clear note separation. Inspired by Peart, Portnoy, Gadd. Resonant higher for singing sustain.',
+    headRel: 'Resonant ~10% higher — melodic sustain, clear pitch',
+    drums: {
+      'BASS':     {batter:58, resonant:55},    // A#1 / A1
+      'SNARE':    {batter:220,resonant:349},    // A3 / F4
+      'HIGH TOM': {batter:220,resonant:247},    // A3 / B3
+      'MID TOM':  {batter:175,resonant:196},    // F3 / G3
+      'FLOOR 1':  {batter:123,resonant:139},    // B2 / C#3
+      'FLOOR 2':  {batter:92, resonant:104}     // F#2 / G#2
+    }
+  },
+  {
+    name: 'LATIN / WORLD', genre: 'Medium / Open / Resonant', cal: 440,
+    desc: 'Open, resonant tuning for hand percussion-friendly sound. Toms ring freely for timbale-like quality. Good for Afro-Cuban, Brazilian styles.',
+    headRel: 'Resonant ~10% higher — open resonance, timbale-like ring',
+    drums: {
+      'BASS':     {batter:55, resonant:55},    // A1 / A1 — equal for resonance
+      'SNARE':    {batter:208,resonant:330},    // G#3 / E4
+      'HIGH TOM': {batter:208,resonant:233},    // G#3 / A#3 — high, timbale-like
+      'MID TOM':  {batter:165,resonant:185},    // E3 / F#3
+      'FLOOR 1':  {batter:123,resonant:139},    // B2 / C#3
+      'FLOOR 2':  {batter:98, resonant:110}     // G2 / A2
+    }
+  },
+];
+
+const PRESET_VERSION = 3; // bump this when defaultPresets change
+
+function getPresets() {
+  const storedVer = parseInt(localStorage.getItem('sp_presets_ver') || '0');
+  const stored = localStorage.getItem('sp_presets');
+
+  if (stored && storedVer >= PRESET_VERSION) {
+    const presets = JSON.parse(stored);
+    // Migrate old flat-number drum freqs to { batter, resonant }
+    let migrated = false;
+    presets.forEach(p => {
+      if (!p.drums) return;
+      for (const [name, val] of Object.entries(p.drums)) {
+        if (typeof val === 'number') {
+          p.drums[name] = { batter: val, resonant: Math.round(val * 1.07) };
+          migrated = true;
+        }
+      }
+    });
+    if (migrated) localStorage.setItem('sp_presets', JSON.stringify(presets));
+    return presets;
+  }
+
+  // Stale or missing — merge: keep user-created presets, replace/add defaults
+  let userPresets = [];
+  if (stored) {
+    try {
+      const old = JSON.parse(stored);
+      const defaultNames = new Set(defaultPresets.map(p => p.name));
+      userPresets = old.filter(p => !defaultNames.has(p.name));
+    } catch(e) {}
+  }
+  const merged = [...defaultPresets, ...userPresets];
+  localStorage.setItem('sp_presets', JSON.stringify(merged));
+  localStorage.setItem('sp_presets_ver', String(PRESET_VERSION));
+  return JSON.parse(JSON.stringify(merged));
+}
+
+function getSessions() {
+  return JSON.parse(localStorage.getItem('sp_sessions') || '[]');
+}
+
+function saveSessions(s) {
+  localStorage.setItem('sp_sessions', JSON.stringify(s));
+}
+
+// ══════════════════════════════════════════════════════
+// S4: SHARED AUDIO ENGINE
+// ══════════════════════════════════════════════════════
+const AudioEngine = {
+  audioCtx: null,
+  analyser: null,
+  micStream: null,
+  dataArray: null,
+  freqData: null,
+  bufferLength: 0,
+  animFrameId: null,
+  pitchCallbacks: [],
+  strikeCallbacks: [],
+
+  // Strike detection state
+  _prevRMS: 0,
+  _strikeArmed: true,
+  _strikeCaptureWindow: null, // { startTime, readings: [] }
+  _decayTracking: false,
+  _decayStartTime: 0,
+  _decayStartRMS: 0,
+
+  async start() {
+    if (AppState.micActive) return;
+    try {
+      this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      this.micStream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+      });
+      const source = this.audioCtx.createMediaStreamSource(this.micStream);
+      this.analyser = this.audioCtx.createAnalyser();
+      this.analyser.fftSize = AppState.sensitivity === 'lab' ? 8192 : 4096;
+      this.analyser.smoothingTimeConstant = AppState.sensitivity === 'lab' ? 0.8 : 0.6;
+      source.connect(this.analyser);
+      this.bufferLength = this.analyser.fftSize;
+      this.dataArray = new Float32Array(this.bufferLength);
+      this.freqData = new Uint8Array(this.analyser.frequencyBinCount);
+      AppState.micActive = true;
+      AppState.clearPitchBuffer();
+      this._prevRMS = 0;
+      this._strikeArmed = true;
+      this._strikeCaptureWindow = null;
+      EventBus.emit('mic-started');
+      this._loop();
+    } catch (e) {
+      alert('Microphone access is required for tuning. Please allow mic access and try again.');
+    }
+  },
+
+  stop() {
+    AppState.micActive = false;
+    if (this.animFrameId) cancelAnimationFrame(this.animFrameId);
+    this.animFrameId = null;
+    if (this.micStream) this.micStream.getTracks().forEach(t => t.stop());
+    if (this.audioCtx) this.audioCtx.close();
+    this.audioCtx = null;
+    this.analyser = null;
+    this.micStream = null;
+    AppState.clearPitchBuffer();
+    AppState.currentDb = -Infinity;
+    EventBus.emit('mic-stopped');
+  },
+
+  toggle() {
+    if (AppState.micActive) this.stop(); else this.start();
+  },
+
+  getAnalyser() { return this.analyser; },
+  getSampleRate() { return this.audioCtx ? this.audioCtx.sampleRate : 48000; },
+  getDeviceName() {
+    if (!this.micStream) return 'None';
+    const tracks = this.micStream.getAudioTracks();
+    return tracks.length > 0 ? tracks[0].label : 'Unknown';
+  },
+  getLatency() {
+    if (!this.audioCtx) return 0;
+    return ((this.audioCtx.baseLatency || 0) + (this.audioCtx.outputLatency || 0)) * 1000;
+  },
+
+  onPitch(cb) { this.pitchCallbacks.push(cb); },
+  onStrike(cb) { this.strikeCallbacks.push(cb); },
+
+  _loop() {
+    if (!AppState.micActive) return;
+    this.analyser.getFloatTimeDomainData(this.dataArray);
+    this.analyser.getByteFrequencyData(this.freqData);
+
+    // RMS / dB
+    let rms = 0;
+    for (let i = 0; i < this.bufferLength; i++) rms += this.dataArray[i] * this.dataArray[i];
+    rms = Math.sqrt(rms / this.bufferLength);
+    const db = 20 * Math.log10(Math.max(rms, 1e-10));
+    AppState.currentRMS = rms;
+    AppState.currentDb = db;
+
+    // Strike detection: RMS derivative spike
+    const rmsDerivative = rms - this._prevRMS;
+    const strikeThreshold = AppState.sensitivity === 'lab' ? 0.02 : 0.05;
+    const now = performance.now();
+
+    if (this._strikeArmed && rmsDerivative > strikeThreshold && rms > 0.01 && (now - AppState.lastStrikeTime > 300)) {
+      // Strike detected! Begin capture window
+      AppState.lastStrikeTime = now;
+      this._strikeArmed = false;
+      this._strikeCaptureWindow = { startTime: now, readings: [] };
+      this._decayTracking = true;
+      this._decayStartTime = now;
+      this._decayStartRMS = rms;
+    }
+
+    // Re-arm strike detection when signal drops
+    if (!this._strikeArmed && rmsDerivative < 0 && (now - AppState.lastStrikeTime > 200)) {
+      this._strikeArmed = true;
+    }
+
+    // Pitch detection
+    const freq = this._autoCorrelate(this.dataArray, this.audioCtx.sampleRate);
+
+    if (freq > 0 && freq < 2000) {
+      const noteInfo = AudioEngine._freqToNote(freq);
+      AppState.currentNote = noteInfo;
+      AppState.addPitchReading(freq);
+
+      // If in capture window, collect readings
+      if (this._strikeCaptureWindow && (now - this._strikeCaptureWindow.startTime < 500)) {
+        this._strikeCaptureWindow.readings.push(freq);
+      } else if (this._strikeCaptureWindow && this._strikeCaptureWindow.readings.length > 0) {
+        // Capture window ended — compute strike pitch
+        const readings = this._strikeCaptureWindow.readings;
+        // Use median for robustness
+        readings.sort((a, b) => a - b);
+        const strikeFreq = readings[Math.floor(readings.length / 2)];
+        AppState.lastStrikeFreq = strikeFreq;
+        this._strikeCaptureWindow = null;
+        // Notify strike listeners
+        this.strikeCallbacks.forEach(cb => { try { cb(strikeFreq); } catch(e) {} });
+        EventBus.emit('strike-detected', strikeFreq);
+      }
+
+      // Notify pitch listeners
+      this.pitchCallbacks.forEach(cb => { try { cb(freq, noteInfo, db); } catch(e) {} });
+      EventBus.emit('freq-update', { freq, note: noteInfo, db });
+    }
+
+    // Decay tracking
+    if (this._decayTracking) {
+      const noiseFloor = AppState.sensitivity === 'lab' ? 0.003 : 0.01;
+      if (rms < noiseFloor && (now - this._decayStartTime > 50)) {
+        AppState.lastDecayMs = Math.round(now - this._decayStartTime);
+        this._decayTracking = false;
+        EventBus.emit('decay-measured', AppState.lastDecayMs);
+      } else if (now - this._decayStartTime > 5000) {
+        // Timeout — very long sustain
+        AppState.lastDecayMs = 5000;
+        this._decayTracking = false;
+      }
+    }
+
+    this._prevRMS = rms;
+    this.animFrameId = requestAnimationFrame(() => this._loop());
+  },
+
+  _autoCorrelate(buffer, sampleRate) {
+    const SIZE = buffer.length;
+    let rms = 0;
+    for (let i = 0; i < SIZE; i++) rms += buffer[i] * buffer[i];
+    rms = Math.sqrt(rms / SIZE);
+    const threshold = AppState.sensitivity === 'lab' ? 0.005 : 0.02;
+    if (rms < threshold) return -1;
+
+    let r1 = 0, r2 = SIZE - 1;
+    const trimThreshold = 0.2;
+    for (let i = 0; i < SIZE / 2; i++) { if (Math.abs(buffer[i]) < trimThreshold) { r1 = i; break; } }
+    for (let i = 1; i < SIZE / 2; i++) { if (Math.abs(buffer[SIZE - i]) < trimThreshold) { r2 = SIZE - i; break; } }
+
+    const buf = buffer.slice(r1, r2);
+    const len = buf.length;
+    if (len < 2) return -1;
+    const c = new Array(len).fill(0);
+    for (let i = 0; i < len; i++) {
+      for (let j = 0; j < len - i; j++) {
+        c[i] += buf[j] * buf[j + i];
+      }
+    }
+
+    let d = 0;
+    while (d < len - 1 && c[d] > c[d + 1]) d++;
+    let maxVal = -1, maxPos = -1;
+    for (let i = d; i < len; i++) {
+      if (c[i] > maxVal) { maxVal = c[i]; maxPos = i; }
+    }
+    if (maxPos < 1) return -1;
+
+    let T0 = maxPos;
+    if (T0 > 0 && T0 < len - 1) {
+      const x1 = c[T0 - 1], x2 = c[T0], x3 = c[T0 + 1];
+      const a = (x1 + x3 - 2 * x2) / 2;
+      if (a !== 0) T0 += (x1 - x3) / (4 * a);
+    }
+
+    return sampleRate / T0;
+  },
+
+  // Note names & freq-to-note (static utility)
+  _noteNames: ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'],
+  _freqToNote(freq) {
+    const midi = 69 + 12 * Math.log2(freq / 440);
+    const rounded = Math.round(midi);
+    const cents = Math.round((midi - rounded) * 100);
+    const octave = Math.floor(rounded / 12) - 1;
+    const name = AudioEngine._noteNames[((rounded % 12) + 12) % 12] + octave;
+    return { name, cents, midi: rounded };
+  }
+};
+
+// Legacy compat: expose freqToNote globally
+function freqToNote(freq) { return AudioEngine._freqToNote(freq); }
+
+// ══════════════════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════════════════
+function navigateTo(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const el = document.getElementById('page-' + page);
+  if (el) el.classList.add('active');
+  AppState.currentPage = page;
+
+  // Update bottom nav
+  document.querySelectorAll('.nav-item').forEach(n => {
+    const navPage = n.dataset.nav;
+    if (navPage === page || (page === 'lugs' && navPage === 'kit') || (page === 'resonance' && navPage === 'kit')) {
+      n.classList.add('active-nav');
+    } else {
+      n.classList.remove('active-nav');
+    }
+  });
+
+  // Page-specific init
+  if (page === 'tuner') refreshTunerTarget();
+  if (page === 'presets') renderPresets();
+  if (page === 'history') renderHistory();
+  if (page === 'lugs') renderLugs();
+  if (page === 'resonance') initResonancePage();
+  if (page === 'kit') refreshKitUI();
+
+  window.scrollTo(0, 0);
+}
+
+// ══════════════════════════════════════════════════════
+// TUNER PAGE
+// ══════════════════════════════════════════════════════
+function toggleMic() { AudioEngine.toggle(); }
+
+// React to mic start/stop
+EventBus.on('mic-started', () => {
+  document.getElementById('mic-icon').textContent = 'mic_off';
+  document.getElementById('mic-btn').classList.add('shadow-[0_0_30px_rgba(0,245,255,0.8)]');
+  // Set target freq display
+  refreshTunerTarget();
+  logSession();
+});
+
+EventBus.on('mic-stopped', () => {
+  document.getElementById('mic-icon').textContent = 'mic';
+  document.getElementById('mic-btn').classList.remove('shadow-[0_0_30px_rgba(0,245,255,0.8)]');
+  document.getElementById('tuner-freq').textContent = '--';
+  document.getElementById('tuner-note').textContent = '--';
+  document.getElementById('tuner-cents').textContent = '--';
+  document.getElementById('tuner-gain').textContent = '--dB';
+  document.getElementById('tuner-decay').textContent = 'DECAY: --';
+  document.getElementById('tuner-delta-val').textContent = '-- Hz';
+  document.getElementById('tuner-delta-val').className = 'text-sm font-mono font-bold text-outline';
+  document.getElementById('tuner-stability').style.opacity = '0';
+  document.getElementById('tuner-direction').style.opacity = '0';
+  document.getElementById('tuner-save-row').classList.add('hidden');
+  const ring = document.getElementById('tuner-ring');
+  ring.className = 'absolute inset-0 rounded-full border-4 border-primary-container/20 border-t-primary-container transition-all duration-300';
+  ring.style.animation = 'spin 4s linear infinite';
+  updateTunerStatus(null);
+});
+
+// React to live pitch data
+EventBus.on('freq-update', ({ freq, note, db }) => {
+  // Update tuner page elements
+  document.getElementById('tuner-freq').textContent = freq.toFixed(1);
+  document.getElementById('tuner-note').textContent = note.name;
+  const centsStr = note.cents >= 0 ? '+' + note.cents + 'c' : note.cents + 'c';
+  document.getElementById('tuner-cents').textContent = centsStr;
+  document.getElementById('tuner-gain').textContent = db.toFixed(1) + 'dB';
+
+  // Update resonance page frequency
+  const resFreq = document.getElementById('res-freq');
+  if (resFreq) resFreq.textContent = freq.toFixed(1);
+
+  // Target frequency comparison — uses active head
+  const head = AppState.getHead();
+  const targetFreq = head ? head.targetFreq : null;
+
+  const deltaEl = document.getElementById('tuner-delta-val');
+  const dirEl = document.getElementById('tuner-direction');
+  const dirText = document.getElementById('tuner-dir-text');
+  const ring = document.getElementById('tuner-ring');
+
+  if (targetFreq) {
+    const delta = freq - targetFreq;
+    const absDelta = Math.abs(delta);
+    const sign = delta >= 0 ? '+' : '';
+    deltaEl.textContent = sign + delta.toFixed(1) + ' Hz';
+
+    // Color-code delta
+    if (absDelta <= 1) {
+      deltaEl.className = 'text-sm font-mono font-bold text-primary-container';
+      ring.className = 'absolute inset-0 rounded-full border-4 border-primary-container/30 border-t-primary-container transition-all duration-300';
+      dirEl.style.opacity = '0';
+      updateTunerStatus(0);
+    } else if (absDelta <= 5) {
+      deltaEl.className = 'text-sm font-mono font-bold text-tertiary-container';
+      ring.className = 'absolute inset-0 rounded-full border-4 border-tertiary-container/30 border-t-tertiary-container transition-all duration-300';
+      dirEl.style.opacity = '1';
+      dirText.textContent = delta > 0 ? 'LOOSEN ↓' : 'TIGHTEN ↑';
+      dirText.className = 'text-[10px] uppercase tracking-wider text-tertiary-container font-bold';
+      updateTunerStatus(5);
+    } else {
+      deltaEl.className = 'text-sm font-mono font-bold text-error';
+      ring.className = 'absolute inset-0 rounded-full border-4 border-error/30 border-t-error transition-all duration-300';
+      dirEl.style.opacity = '1';
+      dirText.textContent = delta > 0 ? 'LOOSEN ↓↓' : 'TIGHTEN ↑↑';
+      dirText.className = 'text-[10px] uppercase tracking-wider text-error font-bold';
+      updateTunerStatus(50);
+    }
+  } else {
+    deltaEl.textContent = '-- Hz';
+    deltaEl.className = 'text-sm font-mono font-bold text-outline';
+    updateTunerStatus(note.cents);
+  }
+
+  // Stability indicator (T5)
+  const stabilityEl = document.getElementById('tuner-stability');
+  const saveRow = document.getElementById('tuner-save-row');
+  if (AppState.pitchStable) {
+    stabilityEl.style.opacity = '1';
+    if (saveRow) saveRow.classList.remove('hidden');
+  } else {
+    stabilityEl.style.opacity = '0';
+    if (saveRow) saveRow.classList.add('hidden');
+  }
+
+  // Keep ring spinning
+  ring.style.animation = 'spin 4s linear infinite';
+
+  drawWaveform();
+});
+
+// React to decay measurements
+EventBus.on('decay-measured', (ms) => {
+  document.getElementById('tuner-decay').textContent = 'DECAY: ' + (ms >= 1000 ? (ms/1000).toFixed(1) + 's' : ms + 'ms');
+});
+
+// React to strike detection
+EventBus.on('strike-detected', (freq) => {
+  // Brief flash on status badge
+  const badge = document.getElementById('tuner-status-badge');
+  if (badge && AppState.currentPage === 'tuner') {
+    badge.textContent = 'STRIKE DETECTED';
+    badge.className = 'absolute top-0 left-1/2 -translate-x-1/2 -translate-y-3 px-3 py-1 rounded-sm text-[9px] font-bold uppercase tracking-[0.15em] bg-tertiary-container text-on-tertiary shadow-[0_0_15px_#ffdb3f] transition-all';
+    setTimeout(() => {
+      if (AppState.currentPage === 'tuner') updateTunerStatus(AppState.currentNote ? AppState.currentNote.cents : null);
+    }, 400);
+  }
+});
+
+function updateTunerStatus(cents) {
+  const badge = document.getElementById('tuner-status-badge');
+  if (!badge) return;
+  if (cents === null) {
+    badge.textContent = 'LISTENING';
+    badge.className = 'absolute top-0 left-1/2 -translate-x-1/2 -translate-y-3 px-3 py-1 rounded-sm text-[9px] font-bold uppercase tracking-[0.15em] bg-surface-container-high text-secondary transition-all';
+    return;
+  }
+  const absCents = Math.abs(cents);
+  if (absCents <= 3) {
+    badge.textContent = 'PHASE LOCKED';
+    badge.className = 'absolute top-0 left-1/2 -translate-x-1/2 -translate-y-3 px-3 py-1 rounded-sm text-[9px] font-bold uppercase tracking-[0.15em] bg-primary-container text-on-primary shadow-[0_0_15px_#00F5FF] transition-all';
+  } else if (absCents <= 10) {
+    badge.textContent = 'FINE TUNING';
+    badge.className = 'absolute top-0 left-1/2 -translate-x-1/2 -translate-y-3 px-3 py-1 rounded-sm text-[9px] font-bold uppercase tracking-[0.15em] bg-surface-container-highest text-primary-container transition-all';
+  } else {
+    badge.textContent = 'SCANNING';
+    badge.className = 'absolute top-0 left-1/2 -translate-x-1/2 -translate-y-3 px-3 py-1 rounded-sm text-[9px] font-bold uppercase tracking-[0.15em] bg-surface-container-high text-secondary transition-all';
+  }
+}
+
+function drawWaveform() {
+  const canvas = document.getElementById('tuner-waveform');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+
+  if (!AppState.micActive || !AudioEngine.freqData) return;
+
+  const freqData = AudioEngine.freqData;
+  const barCount = 32;
+  const step = Math.floor(freqData.length / barCount);
+  const barW = w / barCount - 1;
+
+  for (let i = 0; i < barCount; i++) {
+    let sum = 0;
+    for (let j = 0; j < step; j++) sum += freqData[i * step + j];
+    const avg = sum / step;
+    const barH = (avg / 255) * h;
+    const alpha = 0.2 + (avg / 255) * 0.8;
+    ctx.fillStyle = `rgba(0,245,255,${alpha})`;
+    ctx.fillRect(i * (barW + 1), h - barH, barW, barH);
+  }
+}
+
+function setSensitivity(mode) {
+  AppState.sensitivity = mode;
+  const activeClass = 'flex-1 py-2 bg-primary-container text-on-primary font-bold text-[10px] uppercase tracking-wider active:scale-95 duration-100';
+  const inactiveClass = 'flex-1 py-2 bg-surface-container-high text-secondary font-bold text-[10px] uppercase tracking-wider hover:text-primary transition-colors active:scale-95 duration-100';
+  // Update tuner page buttons
+  const btnLab = document.getElementById('btn-lab');
+  const btnStage = document.getElementById('btn-stage');
+  const desc = document.getElementById('sensitivity-desc');
+  if (btnLab) btnLab.className = mode === 'lab' ? activeClass : inactiveClass;
+  if (btnStage) btnStage.className = mode === 'stage' ? activeClass : inactiveClass;
+  if (desc) desc.textContent = mode === 'lab' ? 'High-precision mode optimized for isolated acoustic environments.' : 'Optimized for live environments with higher noise floors.';
+  // Update settings modal buttons
+  const sLab = document.getElementById('settings-btn-lab');
+  const sStage = document.getElementById('settings-btn-stage');
+  const sDesc = document.getElementById('settings-sensitivity-desc');
+  if (sLab) sLab.className = mode === 'lab' ? activeClass : inactiveClass;
+  if (sStage) sStage.className = mode === 'stage' ? activeClass : inactiveClass;
+  if (sDesc) sDesc.textContent = mode === 'lab' ? 'High-precision mode optimized for isolated acoustic environments.' : 'Optimized for live environments with higher noise floors.';
+  if (AppState.micActive) {
+    AudioEngine.stop();
+    AudioEngine.start();
+  }
+}
+
+// ── Settings Modal ──
+AppState.referencePitch = parseFloat(localStorage.getItem('sp_ref_pitch')) || 440;
+
+function openSettings() {
+  const modal = document.getElementById('settings-modal');
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+  // Sync sensitivity buttons
+  setSensitivity(AppState.sensitivity);
+  // Sync reference pitch
+  document.getElementById('settings-ref-pitch').value = AppState.referencePitch;
+  // Audio engine info
+  if (AudioEngine.audioCtx) {
+    document.getElementById('settings-sr').textContent = (AudioEngine.getSampleRate() / 1000) + ' kHz';
+    document.getElementById('settings-latency').textContent = AudioEngine.getLatency().toFixed(1) + ' ms';
+    document.getElementById('settings-fft').textContent = AudioEngine.analyser ? AudioEngine.analyser.fftSize : '--';
+    document.getElementById('settings-device').textContent = AudioEngine.getDeviceName();
+  } else {
+    document.getElementById('settings-sr').textContent = '--';
+    document.getElementById('settings-latency').textContent = '--';
+    document.getElementById('settings-fft').textContent = '--';
+    document.getElementById('settings-device').textContent = 'Not active';
+  }
+}
+
+function closeSettings() {
+  const modal = document.getElementById('settings-modal');
+  modal.classList.add('hidden');
+  modal.classList.remove('flex');
+}
+
+function setRefPitch(val) {
+  val = Math.min(480, Math.max(400, parseInt(val) || 440));
+  AppState.referencePitch = val;
+  localStorage.setItem('sp_ref_pitch', val);
+  document.getElementById('settings-ref-pitch').value = val;
+}
+
+function adjustRefPitch(delta) {
+  setRefPitch(AppState.referencePitch + delta);
+}
+
+function clearSessionHistory() {
+  if (!confirm('Clear all session history? This cannot be undone.')) return;
+  localStorage.removeItem('sp_sessions');
+  if (AppState.currentPage === 'history') renderHistory();
+  closeSettings();
+}
+
+function resetAllLugReadings() {
+  if (!confirm('Reset all lug readings for every drum? This cannot be undone.')) return;
+  Object.keys(AppState.drumKit).forEach(name => AppState.clearLugReadings(name));
+  closeSettings();
+}
+
+function confirmFactoryReset() {
+  if (!confirm('This will erase ALL data — kit, presets, history, and settings. Are you sure?')) return;
+  if (!confirm('Really? This cannot be undone.')) return;
+  localStorage.clear();
+  location.reload();
+}
+
+// Save the current stable reading for the selected drum
+function saveTunerReading() {
+  if (!AppState.pitchStable || !AppState.currentFreq) return;
+  const drumName = AppState.selectedDrum;
+  const freq = AppState.currentFreq;
+  AppState.setMeasuredFreq(drumName, freq);
+
+  // Update the most recent session with real data
+  const sessions = getSessions();
+  if (sessions.length > 0 && !sessions[0].measuredFreq) {
+    const head = AppState.getHead(drumName);
+    sessions[0].measuredFreq = freq;
+    sessions[0].variance = (freq - (head ? head.targetFreq : 0)).toFixed(1);
+    saveSessions(sessions);
+  }
+
+  // Flash confirmation
+  const saveRow = document.getElementById('tuner-save-row');
+  if (saveRow) {
+    saveRow.innerHTML = `<div class="w-full py-3 bg-surface-container-high text-primary-container font-bold text-[10px] uppercase tracking-[0.15em] flex items-center justify-center gap-2">
+      <span class="material-symbols-outlined text-sm">check_circle</span> SAVED: ${freq.toFixed(1)} Hz for ${drumName}
+    </div>`;
+    setTimeout(() => {
+      saveRow.innerHTML = `<button onclick="saveTunerReading()" class="w-full py-3 bg-primary-container text-on-primary font-bold text-[10px] uppercase tracking-[0.15em] flex items-center justify-center gap-2 active:scale-95 transition-all shadow-[0_0_15px_rgba(0,245,255,0.3)]">
+        <span class="material-symbols-outlined text-sm">save</span> SAVE READING
+      </button>`;
+    }, 2000);
+  }
+}
+
+function refreshTunerTarget() {
+  const head = AppState.getHead();
+  const headLabel = AppState.activeHead === 'batter' ? 'BATTER' : 'RESONANT';
+  const el = document.getElementById('tuner-target');
+  el.innerHTML = AppState.selectedDrum + ' / ' + headLabel + ' <span class="material-symbols-outlined text-sm opacity-60" id="tuner-target-chevron">expand_more</span>';
+  const tf = document.getElementById('tuner-target-freq');
+  if (tf && head) tf.innerHTML = head.targetFreq + ' <span class="text-xs font-normal text-secondary">Hz</span> <span class="text-xs text-primary-container/60">' + hzToNote(head.targetFreq) + '</span>';
+  // Render head toggle
+  const toggle = document.getElementById('tuner-head-toggle');
+  if (toggle) toggle.innerHTML = headToggleHTML();
+  // Populate preset selector
+  populateTunerPresetSelect();
+}
+
+function populateTunerPresetSelect() {
+  const sel = document.getElementById('tuner-preset-select');
+  if (!sel) return;
+  const presets = getPresets();
+  const currentVal = sel.value;
+  sel.innerHTML = '<option value="">— CUSTOM —</option>';
+  presets.forEach((p, idx) => {
+    const opt = document.createElement('option');
+    opt.value = idx;
+    opt.textContent = p.name + (p.genre ? ' — ' + p.genre : '');
+    if (AppState.activePreset === p.name) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+function loadPresetFromTuner(idx) {
+  if (idx === '' || idx === null) return;
+  const presets = getPresets();
+  const p = presets[parseInt(idx)];
+  if (!p) return;
+  AppState.updateTargetFreqs(p.drums);
+  AppState.activePreset = p.name;
+  EventBus.emit('preset-loaded', p);
+  refreshTunerTarget();
+}
+
+function toggleDrumPicker() {
+  const picker = document.getElementById('drum-picker');
+  const isOpen = !picker.classList.contains('hidden');
+  if (isOpen) { closeDrumPicker(); return; }
+  const drums = Object.keys(AppState.drumKit);
+  picker.innerHTML = drums.map(name => {
+    const isActive = name === AppState.selectedDrum;
+    return `<div class="px-4 py-2.5 text-xs uppercase tracking-wider cursor-pointer transition-colors ${isActive ? 'text-primary-container bg-primary-container/10 font-bold' : 'text-secondary hover:text-primary hover:bg-surface-container-highest/50'}" onclick="pickDrum('${name}')">${name}</div>`;
+  }).join('');
+  picker.classList.remove('hidden');
+}
+
+function closeDrumPicker() {
+  document.getElementById('drum-picker').classList.add('hidden');
+}
+
+function pickDrum(name) {
+  closeDrumPicker();
+  selectDrumByName(name);
+}
+
+document.addEventListener('click', (e) => {
+  const picker = document.getElementById('drum-picker');
+  if (!picker.classList.contains('hidden') && !e.target.closest('#tuner-target') && !e.target.closest('#drum-picker')) {
+    closeDrumPicker();
+  }
+});
+
+EventBus.on('drum-selected', () => refreshTunerTarget());
+EventBus.on('targets-updated', () => refreshTunerTarget());
+EventBus.on('head-changed', () => {
+  refreshTunerTarget();
+  // Refresh whichever page is active
+  if (AppState.currentPage === 'kit') refreshKitUI();
+  if (AppState.currentPage === 'lugs') renderLugs();
+  if (AppState.currentPage === 'resonance') initResonancePage();
+});
+
+// ══════════════════════════════════════════════════════
+// KIT PAGE — Dynamic Layout
+// ══════════════════════════════════════════════════════
+
+// Standard drum kit layout positions (percentage-based, scaled by size)
+// Each drum type has a default position; user-added drums get placed in overflow
+// Classify drums by role for smart layout
+function classifyDrum(name) {
+  const n = name.toUpperCase();
+  if (n.includes('BASS') || n.includes('KICK')) return 'bass';
+  if (n.includes('SNARE')) return 'snare';
+  if (n.includes('FLOOR') || n.includes('FLR')) return 'floor';
+  if (n.includes('TOM') || n.includes('RACK')) return 'tom';
+  return 'other';
+}
+
+function renderKitVisual() {
+  const container = document.getElementById('kit-visual');
+  container.innerHTML = '';
+  const drums = Object.entries(AppState.drumKit);
+  const maxSize = Math.max(...drums.map(([,d]) => d.size || 12));
+
+  // Sort drums into groups for intelligent layout
+  const bass = drums.filter(([n]) => classifyDrum(n) === 'bass');
+  const snares = drums.filter(([n]) => classifyDrum(n) === 'snare');
+  const toms = drums.filter(([n]) => classifyDrum(n) === 'tom');
+  const floors = drums.filter(([n]) => classifyDrum(n) === 'floor');
+  const others = drums.filter(([n]) => classifyDrum(n) === 'other');
+
+  // Sort toms by size (smallest = highest pitch = leftmost rack position)
+  toms.sort((a, b) => (a[1].size || 12) - (b[1].size || 12));
+  // Sort floors by size
+  floors.sort((a, b) => (a[1].size || 12) - (b[1].size || 12));
+
+  // Build position map based on actual kit composition
+  const positions = {};
+
+  // Bass: center bottom
+  bass.forEach(([name], i) => {
+    positions[name] = { cx: 46 + i * 12, cy: 61 };
+  });
+
+  // Snare: left of bass
+  snares.forEach(([name], i) => {
+    positions[name] = { cx: 16 + i * 14, cy: 55 };
+  });
+
+  // Toms: spread across the top, evenly spaced
+  const tomCount = toms.length;
+  toms.forEach(([name], i) => {
+    const startX = tomCount <= 2 ? 30 : 20;
+    const spread = tomCount <= 2 ? 28 : Math.min(22, 56 / Math.max(tomCount - 1, 1));
+    positions[name] = { cx: startX + i * spread, cy: tomCount > 3 ? 27 + (i % 2) * 8 : 31 };
+  });
+
+  // Floors: right side, stacked vertically
+  floors.forEach(([name], i) => {
+    positions[name] = { cx: 78 + i * 8, cy: 37 + i * 22 };
+  });
+
+  // Others: below the kit
+  others.forEach(([name], i) => {
+    positions[name] = { cx: 20 + i * 20, cy: 88 };
+  });
+
+  // Determine if we need extra height
+  const allDrums = [...bass, ...snares, ...toms, ...floors, ...others];
+  const hasExtras = others.length > 0 || drums.length > 7;
+  if (hasExtras) container.style.aspectRatio = '1 / 0.85';
+  else container.style.aspectRatio = '1 / 0.75';
+
+  // Render each drum
+  allDrums.forEach(([name, drum]) => {
+    const pos = positions[name] || { cx: 50, cy: 50 };
+
+    // Scale circle size proportionally
+    const sizePx = Math.max(52, Math.min(160, ((drum.size || 12) / maxSize) * 150));
+    const isSelected = name === AppState.selectedDrum;
+
+    // Status dot color: worst of batter and resonant
+    let dotColor = 'bg-outline';
+    const batHead = drum.batter || {};
+    const resHead = drum.resonant || {};
+    const batDelta = batHead.measuredFreq != null ? Math.abs(batHead.measuredFreq - batHead.targetFreq) : null;
+    const resDelta = resHead.measuredFreq != null ? Math.abs(resHead.measuredFreq - resHead.targetFreq) : null;
+    const worstDelta = [batDelta, resDelta].filter(d => d != null);
+    if (worstDelta.length > 0) {
+      const maxDelta = Math.max(...worstDelta);
+      if (maxDelta <= 2) dotColor = 'bg-primary-container shadow-[0_0_6px_#00F5FF]';
+      else if (maxDelta <= 5) dotColor = 'bg-tertiary-container shadow-[0_0_6px_#ffdb3f]';
+      else dotColor = 'bg-error shadow-[0_0_6px_#ffb4ab]';
+    }
+
+    const el = document.createElement('div');
+    el.className = `drum-piece absolute rounded-full border-4 flex items-center justify-center cursor-pointer transition-all group ${isSelected ? 'bg-surface-container-high border-primary-container drum-glow z-10' : 'border-secondary/30 hover:border-primary-container'}`;
+    el.dataset.drum = name;
+    el.style.width = sizePx + 'px';
+    el.style.height = sizePx + 'px';
+    el.style.left = `calc(${pos.cx}% - ${sizePx / 2}px)`;
+    el.style.top = `calc(${pos.cy}% - ${sizePx / 2}px)`;
+    el.style.borderRadius = '50%';
+    el.onclick = () => selectDrumByName(name);
+
+    const fontSize = sizePx < 65 ? '0.4rem' : sizePx < 90 ? '0.5rem' : '0.6rem';
+    el.innerHTML = `
+      <div class="flex flex-col items-center justify-center text-center px-1">
+        <span class="${isSelected ? 'text-primary-container font-bold' : 'text-secondary opacity-40 group-hover:opacity-100'} uppercase tracking-widest" style="font-size:${fontSize}">${name}</span>
+        <span class="text-[8px] ${isSelected ? 'text-primary-container/60' : 'text-secondary/30 group-hover:text-secondary/60'} mt-0.5">${drum.size}"</span>
+      </div>
+      <div class="kit-status-dot absolute -top-1 -right-1 w-3 h-3 rounded-full border border-surface ${dotColor}"></div>`;
+    container.appendChild(el);
+  });
+}
+
+function refreshKitUI() {
+  renderKitVisual();
+  const toggle = document.getElementById('kit-head-toggle');
+  if (toggle) toggle.innerHTML = headToggleHTML();
+  selectDrumByName(AppState.selectedDrum);
+  const badge = document.getElementById('kit-preset-badge');
+  if (badge && AppState.activePreset) {
+    badge.textContent = 'PRESET: ' + AppState.activePreset;
+    badge.style.opacity = '1';
+  } else if (badge) {
+    badge.style.opacity = '0';
+  }
+}
+
+function selectDrumByName(name) {
+  if (!AppState.drumKit[name]) name = Object.keys(AppState.drumKit)[0];
+  AppState.setSelectedDrum(name);
+  const drum = AppState.getDrum(name);
+
+  // Update visual selection
+  document.querySelectorAll('.drum-piece').forEach(d => {
+    const dn = d.dataset.drum;
+    const isThis = dn === name;
+    d.classList.toggle('bg-surface-container-high', isThis);
+    d.classList.toggle('border-primary-container', isThis);
+    d.classList.toggle('drum-glow', isThis);
+    d.classList.toggle('z-10', isThis);
+    d.classList.toggle('border-secondary/30', !isThis);
+    const sp = d.querySelector('span');
+    if (sp) {
+      sp.classList.toggle('text-primary-container', isThis);
+      sp.classList.toggle('font-bold', isThis);
+      sp.classList.toggle('text-secondary', !isThis);
+      sp.classList.toggle('opacity-40', !isThis);
+    }
+  });
+
+  // Update info panel — reads from active head
+  const head = AppState.getHead(name);
+  document.getElementById('kit-active').textContent = name;
+  document.getElementById('kit-size').textContent = (drum.size || '?') + '"';
+  document.getElementById('kit-freq').textContent = (head ? head.targetFreq + ' HZ  ' + hzToNote(head.targetFreq) : '-- HZ');
+  document.getElementById('kit-tension').textContent = head && head.measuredFreq ? head.measuredFreq.toFixed(1) + ' HZ' : '-- HZ';
+  document.getElementById('kit-lugs').textContent = drum.lugs;
+
+  const deltaEl = document.getElementById('kit-delta');
+  if (head && head.measuredFreq != null) {
+    const delta = head.measuredFreq - head.targetFreq;
+    const sign = delta >= 0 ? '+' : '';
+    deltaEl.textContent = sign + delta.toFixed(1) + ' Hz';
+    const absDelta = Math.abs(delta);
+    deltaEl.className = 'text-sm font-mono font-bold ' + (absDelta <= 2 ? 'text-primary-container' : absDelta <= 5 ? 'text-tertiary-container' : 'text-error');
+  } else {
+    deltaEl.textContent = '--';
+    deltaEl.className = 'text-sm font-mono font-bold text-outline';
+  }
+
+  const lastEl = document.getElementById('kit-last-tuned');
+  lastEl.textContent = head && head.lastTuned ? timeSince(new Date(head.lastTuned)) : 'NEVER';
+
+  document.getElementById('tuner-target').textContent = name;
+}
+
+// Legacy compat: onclick="selectDrum(this)" from any remaining hardcoded refs
+function selectDrum(el) { selectDrumByName(el.dataset.drum); }
+
+// Refresh when measurements saved
+EventBus.on('drum-measured', () => {
+  if (AppState.currentPage === 'kit') renderKitVisual();
+});
+
+// ── Kit Config Modal ──
+function showKitConfig() {
+  const list = document.getElementById('kit-config-list');
+  list.innerHTML = '';
+  Object.entries(AppState.drumKit).forEach(([name, drum]) => {
+    list.innerHTML += `
+      <div class="bg-surface-container-high p-4 relative" data-config-drum="${name}">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="text-sm font-bold text-primary uppercase tracking-wide flex-1">${name}</span>
+          <button onclick="removeKitDrum('${name}')" class="text-error/60 hover:text-error transition-colors" title="Remove drum">
+            <span class="material-symbols-outlined text-sm">close</span>
+          </button>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="text-[8px] uppercase tracking-wider text-secondary block mb-1">SIZE (")</label>
+            <input type="number" min="6" max="30" step="0.5" value="${drum.size || 12}" data-cfg-size="${name}" class="w-full bg-surface-container-lowest border-none py-1.5 px-2 text-primary text-xs focus:outline-none focus:ring-1 focus:ring-primary-container"/>
+          </div>
+          <div>
+            <label class="text-[8px] uppercase tracking-wider text-secondary block mb-1">LUGS</label>
+            <input type="number" min="4" max="20" step="1" value="${drum.lugs}" data-cfg-lugs="${name}" class="w-full bg-surface-container-lowest border-none py-1.5 px-2 text-primary text-xs focus:outline-none focus:ring-1 focus:ring-primary-container"/>
+          </div>
+          <div>
+            <label class="text-[8px] uppercase tracking-wider text-primary-container block mb-1">BATTER Hz</label>
+            <input type="number" min="20" max="1000" step="1" value="${drum.batter.targetFreq}" data-cfg-batter="${name}" class="w-full bg-surface-container-lowest border-none py-1.5 px-2 text-primary text-xs focus:outline-none focus:ring-1 focus:ring-primary-container"/>
+          </div>
+          <div>
+            <label class="text-[8px] uppercase tracking-wider text-secondary block mb-1">RESONANT Hz</label>
+            <input type="number" min="20" max="1000" step="1" value="${drum.resonant.targetFreq}" data-cfg-resonant="${name}" class="w-full bg-surface-container-lowest border-none py-1.5 px-2 text-primary text-xs focus:outline-none focus:ring-1 focus:ring-primary-container"/>
+          </div>
+        </div>
+      </div>`;
+  });
+  document.getElementById('kit-config-modal').classList.remove('hidden');
+  document.getElementById('kit-config-modal').classList.add('flex');
+}
+
+function closeKitConfig() {
+  document.getElementById('kit-config-modal').classList.add('hidden');
+  document.getElementById('kit-config-modal').classList.remove('flex');
+}
+
+function saveKitConfig() {
+  document.querySelectorAll('[data-cfg-size]').forEach(input => {
+    const name = input.dataset.cfgSize;
+    const drum = AppState.drumKit[name];
+    if (!drum) return;
+    drum.size = parseFloat(input.value) || 12;
+  });
+  document.querySelectorAll('[data-cfg-lugs]').forEach(input => {
+    const name = input.dataset.cfgLugs;
+    const drum = AppState.drumKit[name];
+    if (!drum) return;
+    const newLugs = parseInt(input.value) || 6;
+    if (newLugs !== drum.lugs) {
+      drum.lugs = newLugs;
+      drum.batter.lugReadings = [];
+      drum.resonant.lugReadings = [];
+    }
+  });
+  document.querySelectorAll('[data-cfg-batter]').forEach(input => {
+    const name = input.dataset.cfgBatter;
+    const drum = AppState.drumKit[name];
+    if (drum) drum.batter.targetFreq = parseInt(input.value) || 100;
+  });
+  document.querySelectorAll('[data-cfg-resonant]').forEach(input => {
+    const name = input.dataset.cfgResonant;
+    const drum = AppState.drumKit[name];
+    if (drum) drum.resonant.targetFreq = parseInt(input.value) || 100;
+  });
+  AppState.persistKit();
+  closeKitConfig();
+  refreshKitUI();
+}
+
+function removeKitDrum(name) {
+  if (Object.keys(AppState.drumKit).length <= 1) {
+    alert('You need at least one drum in the kit.');
+    return;
+  }
+  const row = document.querySelector(`[data-config-drum="${name}"]`);
+  if (row) row.remove();
+  AppState.removeDrum(name);
+}
+
+function addDrumToKit() {
+  const existing = Object.keys(AppState.drumKit);
+  // Generate a name
+  let newName = 'TOM ' + (existing.length + 1);
+  let counter = existing.length + 1;
+  while (AppState.drumKit[newName]) {
+    counter++;
+    newName = 'TOM ' + counter;
+  }
+
+  // Prompt for name
+  const name = prompt('Drum name (e.g., RACK TOM, AUX SNARE):', newName);
+  if (!name || !name.trim()) return;
+  const upperName = name.trim().toUpperCase();
+  if (AppState.drumKit[upperName]) {
+    alert('A drum with that name already exists.');
+    return;
+  }
+
+  AppState.addDrum(upperName, { targetFreq: 100, lugs: 6, size: 12 });
+  showKitConfig(); // re-render the config list
+}
+
+function tuneSelectedDrum() {
+  navigateTo('tuner');
+  document.getElementById('tuner-target').textContent = AppState.selectedDrum;
+  if (!AppState.micActive) AudioEngine.start();
+}
+
+// ══════════════════════════════════════════════════════
+// LUGS PAGE
+// ══════════════════════════════════════════════════════
+function renderLugs() {
+  const drum = AppState.getDrum();
+  const head = AppState.getHead();
+  if (!drum || !head) return;
+  const numLugs = drum.lugs;
+  const targetFreq = head.targetFreq;
+  const container = document.getElementById('lug-nodes');
+  container.innerHTML = '';
+
+  // Render head toggle
+  const toggle = document.getElementById('lugs-head-toggle');
+  if (toggle) toggle.innerHTML = headToggleHTML();
+
+  // Use stored readings from active head
+  const readings = head.lugReadings || [];
+
+  // Compute average of measured lugs
+  const measured = readings.filter(r => r && r.freq != null);
+  const avgFreq = measured.length > 0 ? measured.reduce((s, r) => s + r.freq, 0) / measured.length : null;
+
+  document.getElementById('lug-total-freq').textContent = avgFreq != null ? avgFreq.toFixed(1) : '--';
+  // Preserve active lug index if valid, otherwise reset to 0
+  if (AppState.activeLugIndex >= numLugs) AppState.activeLugIndex = 0;
+  const activeIdx = AppState.activeLugIndex;
+  const headLabel = AppState.activeHead === 'batter' ? 'BATTER' : 'RESONANT';
+  document.getElementById('lug-active-label').textContent = AppState.selectedDrum + ' ' + headLabel + ': LUG ' + String(activeIdx + 1).padStart(2, '0');
+  document.getElementById('lug-target-freq').innerHTML = targetFreq.toFixed(1) + ' <span class="text-xs font-normal text-secondary">HZ</span>';
+
+  // Update status based on balance
+  const statusEl = document.querySelector('#page-lugs .absolute.inset-0.flex');
+
+  for (let i = 0; i < numLugs; i++) {
+    const angle = (i / numLugs) * 2 * Math.PI - Math.PI / 2;
+    const r = 45;
+    const x = 50 + r * Math.cos(angle);
+    const y = 50 + r * Math.sin(angle);
+
+    const reading = readings[i];
+    const hasMeasurement = reading && reading.freq != null;
+    const isActive = i === AppState.activeLugIndex;
+
+    // Color based on deviation from average
+    let dotColor = 'bg-secondary-container'; // unmeasured
+    let dotGlow = '';
+    if (hasMeasurement && avgFreq != null) {
+      const dev = Math.abs((reading.freq - avgFreq) / avgFreq * 100);
+      if (dev < 0.5) { dotColor = 'bg-primary-container'; dotGlow = 'shadow-[0_0_10px_#00F5FF]'; }
+      else if (dev < 2) { dotColor = 'bg-tertiary-container'; dotGlow = 'shadow-[0_0_8px_#ffdb3f]'; }
+      else { dotColor = 'bg-error'; dotGlow = 'shadow-[0_0_8px_#ffb4ab]'; }
+    }
+
+    const freqLabel = hasMeasurement ? reading.freq.toFixed(1) : '--';
+    const lugNum = String(i + 1).padStart(2, '0');
+
+    // Active lug gets a pulsing ring and different styling
+    const activeRing = isActive ? '<div class="absolute inset-0 rounded-full border-2 border-primary-container pulse-ring"></div>' : '';
+    const activeBorder = isActive ? 'border-2 border-primary-container' : 'border border-transparent';
+    const labelColor = isActive ? 'text-primary-container font-bold' : 'text-secondary';
+
+    const node = document.createElement('div');
+    // 44px touch target, centered on the lug position
+    node.className = 'lug-node cursor-pointer';
+    node.style.left = x + '%';
+    node.style.top = y + '%';
+    node.style.width = '44px';
+    node.style.height = '44px';
+    node.style.marginLeft = '-22px';
+    node.style.marginTop = '-22px';
+    node.style.position = 'absolute';
+    node.style.transform = 'none'; // override the .lug-node translate
+    node.style.display = 'flex';
+    node.style.alignItems = 'center';
+    node.style.justifyContent = 'center';
+    node.style.zIndex = isActive ? '15' : '10';
+
+    node.innerHTML = `
+      <div class="relative flex flex-col items-center justify-center w-full h-full rounded-full ${activeBorder} active:scale-110 transition-all">
+        ${activeRing}
+        <div class="w-3.5 h-3.5 rounded-full ${dotColor} ${dotGlow} transition-colors"></div>
+        <span class="absolute -bottom-0.5 text-[7px] ${labelColor} tracking-wider">${lugNum}</span>
+      </div>
+      <div class="absolute -top-7 left-1/2 -translate-x-1/2 ${isActive ? 'opacity-100' : 'opacity-0'} transition-opacity bg-surface-container-highest px-2 py-0.5 pointer-events-none whitespace-nowrap z-20 rounded-sm">
+        <p class="text-[8px] font-mono text-primary">${freqLabel} Hz</p>
+      </div>`;
+    node.onclick = () => selectLug(i);
+    container.appendChild(node);
+  }
+
+  renderLugLog();
+}
+
+function selectLug(idx) {
+  AppState.activeLugIndex = idx;
+  AppState.lugMeasuring = true;
+  document.getElementById('lug-active-label').textContent = AppState.selectedDrum + ': LUG ' + String(idx + 1).padStart(2, '0');
+
+  // Re-render the whole lug graphic so active state, colors, and labels update
+  renderLugs();
+
+  // If mic not running, start it
+  if (!AppState.micActive) AudioEngine.start();
+}
+
+// Listen for strikes on the lug page
+EventBus.on('strike-detected', (freq) => {
+  if (AppState.currentPage !== 'lugs' || !AppState.lugMeasuring) return;
+
+  const drum = AppState.getDrum();
+  const idx = AppState.activeLugIndex;
+
+  // Save the reading
+  AppState.setLugReading(AppState.selectedDrum, idx, {
+    freq: freq,
+    decay: AppState.lastDecayMs,
+    timestamp: new Date().toISOString()
+  });
+
+  // Auto-advance to next unmeasured lug
+  const numLugs = drum.lugs;
+  let nextIdx = -1;
+  for (let offset = 1; offset <= numLugs; offset++) {
+    const candidate = (idx + offset) % numLugs;
+    const headObj = AppState.getHead();
+    const r = (headObj ? headObj.lugReadings || [] : [])[candidate];
+    if (!r || r.freq == null) { nextIdx = candidate; break; }
+  }
+
+  // Re-render to show updated data
+  renderLugs();
+
+  // Auto-select next unmeasured lug
+  if (nextIdx >= 0) {
+    setTimeout(() => selectLug(nextIdx), 300);
+  } else {
+    AppState.lugMeasuring = false;
+  }
+});
+
+function renderLugLog() {
+  const log = document.getElementById('lug-log');
+  log.innerHTML = '';
+  const drum = AppState.getDrum();
+  const head = AppState.getHead();
+  if (!drum || !head) return;
+  const readings = head.lugReadings || [];
+  const numLugs = drum.lugs;
+  const measured = readings.filter(r => r && r.freq != null);
+  const avgFreq = measured.length > 0 ? measured.reduce((s, r) => s + r.freq, 0) / measured.length : null;
+
+  for (let i = 0; i < numLugs; i++) {
+    const reading = readings[i];
+    const hasMeasurement = reading && reading.freq != null;
+    const isActive = i === AppState.activeLugIndex;
+
+    let freqStr = '-- Hz';
+    let devStr = 'NULL';
+    let devColor = 'text-outline';
+
+    if (hasMeasurement && avgFreq != null) {
+      freqStr = reading.freq.toFixed(1) + 'Hz';
+      const dev = ((reading.freq - avgFreq) / avgFreq * 100);
+      devStr = (dev >= 0 ? '+' : '') + dev.toFixed(1) + '%';
+      const absDev = Math.abs(dev);
+      devColor = absDev < 0.5 ? 'text-primary-container' : (dev < 0 ? 'text-error' : 'text-tertiary-container');
+    } else if (hasMeasurement) {
+      freqStr = reading.freq.toFixed(1) + 'Hz';
+      devStr = '--';
+    }
+
+    log.innerHTML += `
+      <div class="flex items-center justify-between p-2 ${isActive ? 'bg-primary-container/10 border-l-2 border-primary-container' : 'bg-surface-container-low'} cursor-pointer" onclick="selectLug(${i})">
+        <span class="text-[10px] ${isActive ? 'text-primary-container font-bold' : 'text-secondary'}">LUG ${String(i+1).padStart(2,'0')}</span>
+        <span class="font-mono text-[11px] text-primary">${freqStr}</span>
+        <span class="font-mono text-[9px] ${devColor}">${devStr}</span>
+      </div>`;
+  }
+}
+
+function resetLugAnalysis() {
+  AppState.clearLugReadings(AppState.selectedDrum);
+  AppState.activeLugIndex = 0;
+  AppState.lugMeasuring = false;
+  renderLugs();
+}
+
+// ══════════════════════════════════════════════════════
+// PRESETS PAGE
+// ══════════════════════════════════════════════════════
+function renderPresets() {
+  const presets = getPresets();
+  const search = (document.getElementById('preset-search').value || '').toLowerCase();
+  const filtered = presets.filter(p => !search || p.name.toLowerCase().includes(search) || (p.genre || '').toLowerCase().includes(search));
+  const list = document.getElementById('preset-list');
+  list.innerHTML = '';
+
+  filtered.forEach((p, idx) => {
+    const drumEntries = Object.entries(p.drums || {});
+    const isActive = AppState.activePreset === p.name;
+    let drumsHTML = '';
+    const fmtDrumRow = (k, v) => {
+      if (typeof v === 'object') {
+        const bNote = hzToNote(v.batter);
+        const rNote = hzToNote(v.resonant);
+        return `<div class="flex justify-between items-center">
+          <span class="text-[10px] text-secondary uppercase w-20">${k}</span>
+          <span class="text-primary font-bold text-sm">${v.batter}<span class="text-[9px] text-secondary font-normal ml-0.5">${bNote}</span></span>
+          <span class="text-[9px] text-outline mx-1">/</span>
+          <span class="text-primary font-bold text-sm">${v.resonant}<span class="text-[9px] text-secondary font-normal ml-0.5">${rNote}</span></span>
+        </div>`;
+      }
+      return `<div class="flex justify-between items-center"><span class="text-[10px] text-secondary uppercase">${k}</span><span class="text-primary-container font-bold text-sm">${v} Hz</span></div>`;
+    };
+    drumsHTML = `<div class="mb-1"><div class="flex justify-between text-[8px] text-outline uppercase tracking-wider mb-1 px-0"><span class="w-20">DRUM</span><span>BATTER</span><span class="mx-1"></span><span>RESONANT</span></div></div>
+      <div class="space-y-1 mb-3">${drumEntries.map(([k, v]) => fmtDrumRow(k, v)).join('')}</div>`;
+
+    const descHTML = p.desc ? `<p class="text-[9px] text-outline leading-relaxed mb-3">${p.desc}</p>` : '';
+    const headRelHTML = p.headRel ? `<p class="text-[8px] text-primary-container/60 uppercase tracking-wider mb-3">↕ ${p.headRel}</p>` : '';
+
+    list.innerHTML += `
+      <div class="bg-surface-container-low p-5 ${isActive ? 'border-l-2 border-primary-container' : ''}">
+        <div class="flex justify-between items-start mb-2">
+          <div>
+            <h3 class="text-lg font-bold uppercase tracking-wide text-primary">${p.name}</h3>
+            <p class="text-[10px] text-secondary uppercase">${p.genre || ''}${isActive ? ' · ACTIVE' : ''}</p>
+          </div>
+          <div class="text-right">
+            <p class="text-[9px] text-secondary uppercase">CALIBRATION</p>
+            <p class="text-sm font-bold text-primary-container">A = ${p.cal || 440}HZ</p>
+          </div>
+        </div>
+        ${descHTML}${headRelHTML}${drumsHTML}
+        <div class="flex gap-2">
+          <button onclick="loadPreset(${idx})" class="flex-1 py-2 ${isActive ? 'bg-surface-container-high text-primary-container' : 'bg-primary-container text-on-primary'} font-bold text-[10px] uppercase tracking-wider active:scale-95">${isActive ? 'LOADED' : 'LOAD CONFIG'}</button>
+          <button onclick="deletePreset(${idx})" class="py-2 px-3 bg-surface-container-high text-secondary text-[10px] uppercase tracking-wider active:scale-95">
+            <span class="material-symbols-outlined text-sm">delete</span>
+          </button>
+        </div>
+      </div>`;
+  });
+}
+
+function loadPreset(idx) {
+  const presets = getPresets();
+  const p = presets[idx];
+  if (!p) return;
+  AppState.updateTargetFreqs(p.drums);
+  AppState.activePreset = p.name;
+  EventBus.emit('preset-loaded', p);
+  navigateTo('kit');
+}
+
+function deletePreset(idx) {
+  const presets = getPresets();
+  if (AppState.activePreset === presets[idx]?.name) AppState.activePreset = null;
+  presets.splice(idx, 1);
+  localStorage.setItem('sp_presets', JSON.stringify(presets));
+  renderPresets();
+}
+
+let presetSource = 'targets'; // 'targets' or 'measured'
+
+function setPresetSource(src) {
+  presetSource = src;
+  const btnT = document.getElementById('preset-src-targets');
+  const btnM = document.getElementById('preset-src-measured');
+  if (src === 'targets') {
+    btnT.className = 'flex-1 py-1.5 bg-primary-container text-on-primary font-bold text-[9px] uppercase tracking-wider active:scale-95';
+    btnM.className = 'flex-1 py-1.5 bg-surface-container-high text-secondary font-bold text-[9px] uppercase tracking-wider active:scale-95';
+  } else {
+    btnM.className = 'flex-1 py-1.5 bg-primary-container text-on-primary font-bold text-[9px] uppercase tracking-wider active:scale-95';
+    btnT.className = 'flex-1 py-1.5 bg-surface-container-high text-secondary font-bold text-[9px] uppercase tracking-wider active:scale-95';
+  }
+  populatePresetDrumFields();
+}
+
+function populatePresetDrumFields() {
+  const container = document.getElementById('preset-drum-fields');
+  container.innerHTML = '';
+  Object.entries(AppState.drumKit).forEach(([name, drum]) => {
+    const bat = presetSource === 'measured' && drum.batter.measuredFreq ? drum.batter.measuredFreq : drum.batter.targetFreq;
+    const res = presetSource === 'measured' && drum.resonant.measuredFreq ? drum.resonant.measuredFreq : drum.resonant.targetFreq;
+    container.innerHTML += `
+      <div class="col-span-2 flex items-center gap-2">
+        <span class="text-[9px] text-secondary uppercase w-16 shrink-0">${name}</span>
+        <input type="number" data-drum-bat="${name}" value="${Math.round(bat)}" class="flex-1 bg-surface-container-lowest border-none py-1 px-2 text-primary text-xs focus:outline-none focus:ring-1 focus:ring-primary-container" placeholder="Batter"/>
+        <span class="text-[8px] text-outline">/</span>
+        <input type="number" data-drum-res="${name}" value="${Math.round(res)}" class="flex-1 bg-surface-container-lowest border-none py-1 px-2 text-primary text-xs focus:outline-none focus:ring-1 focus:ring-primary-container" placeholder="Resonant"/>
+      </div>`;
+  });
+}
+
+function showCreatePreset() {
+  presetSource = 'targets';
+  document.getElementById('preset-name').value = '';
+  document.getElementById('preset-genre').value = '';
+  document.getElementById('preset-cal').value = '440';
+  setPresetSource('targets');
+  document.getElementById('preset-modal').classList.remove('hidden');
+  document.getElementById('preset-modal').classList.add('flex');
+}
+
+function closePresetModal() {
+  document.getElementById('preset-modal').classList.add('hidden');
+  document.getElementById('preset-modal').classList.remove('flex');
+}
+
+function saveNewPreset() {
+  const name = document.getElementById('preset-name').value.trim();
+  if (!name) return;
+  const genre = document.getElementById('preset-genre').value.trim();
+  const cal = parseInt(document.getElementById('preset-cal').value) || 440;
+  const drums = {};
+  // Read from per-drum batter/resonant fields
+  document.querySelectorAll('[data-drum-bat]').forEach(input => {
+    const name = input.dataset.drumBat;
+    if (!drums[name]) drums[name] = {};
+    drums[name].batter = parseInt(input.value) || 100;
+  });
+  document.querySelectorAll('[data-drum-res]').forEach(input => {
+    const name = input.dataset.drumRes;
+    if (!drums[name]) drums[name] = {};
+    drums[name].resonant = parseInt(input.value) || 100;
+  });
+  const presets = getPresets();
+  presets.push({ name, genre, cal, drums });
+  localStorage.setItem('sp_presets', JSON.stringify(presets));
+  closePresetModal();
+  renderPresets();
+}
+
+document.getElementById('preset-search')?.addEventListener('input', renderPresets);
+
+// ══════════════════════════════════════════════════════
+// HISTORY PAGE
+// ══════════════════════════════════════════════════════
+function logSession() {
+  const head = AppState.getHead();
+  const sessions = getSessions();
+  sessions.unshift({
+    date: new Date().toISOString(),
+    drum: AppState.selectedDrum,
+    head: AppState.activeHead,
+    mode: AppState.sensitivity === 'lab' ? 'Precision Mode' : 'Stage Mode',
+    targetFreq: head ? head.targetFreq : 0,
+    measuredFreq: null,
+    variance: null
+  });
+  if (sessions.length > 50) sessions.pop();
+  saveSessions(sessions);
+}
+
+// Update most recent session when we get a strike reading
+EventBus.on('strike-detected', (freq) => {
+  const sessions = getSessions();
+  if (sessions.length === 0) return;
+  const latest = sessions[0];
+  if (!latest.measuredFreq) {
+    latest.measuredFreq = freq;
+    latest.variance = (freq - (latest.targetFreq || 0)).toFixed(1);
+    saveSessions(sessions);
+  }
+});
+
+let historyFilter = 'ALL';
+
+function setHistoryFilter(drum) {
+  historyFilter = drum;
+  renderHistory();
+}
+
+function renderHistoryFilters() {
+  const bar = document.getElementById('hist-filter-bar');
+  if (!bar) return;
+  bar.innerHTML = '';
+  const drums = ['ALL', ...Object.keys(AppState.drumKit)];
+  drums.forEach(name => {
+    const isActive = historyFilter === name;
+    const label = name.length > 8 ? name.slice(0, 6) : name;
+    bar.innerHTML += `<button onclick="setHistoryFilter('${name}')" class="hist-filter-btn px-3 py-1 text-[9px] uppercase tracking-wider font-bold shrink-0 active:scale-95 ${isActive ? 'bg-primary-container text-on-primary' : 'bg-surface-container-high text-secondary'}">${label}</button>`;
+  });
+}
+
+function saveEnvData() {
+  const temp = document.getElementById('hist-temp').value;
+  const humidity = document.getElementById('hist-humidity').value;
+  localStorage.setItem('sp_env', JSON.stringify({ temp, humidity }));
+}
+
+function loadEnvData() {
+  const stored = localStorage.getItem('sp_env');
+  if (stored) {
+    const env = JSON.parse(stored);
+    document.getElementById('hist-temp').value = env.temp || '';
+    document.getElementById('hist-humidity').value = env.humidity || '';
+  }
+}
+
+function renderHistory() {
+  loadEnvData();
+  renderHistoryFilters();
+  const allSessions = getSessions();
+  const filtered = historyFilter === 'ALL' ? allSessions : allSessions.filter(s => s.drum === historyFilter);
+
+  document.getElementById('hist-session-count').textContent = filtered.length;
+  document.getElementById('hist-last-cal').textContent = filtered.length > 0 ? timeSince(new Date(filtered[0].date)) : '--';
+
+  // Dynamic drum ID
+  const drumLabel = historyFilter === 'ALL' ? AppState.selectedDrum : historyFilter;
+  document.getElementById('hist-drum-id').textContent = 'DRUM ID: ' + drumLabel.replace(' ', '-');
+
+  // Compute real quick stats
+  const measured = filtered.filter(s => s.variance != null);
+  if (measured.length > 0) {
+    // Peak decay: use AppState if available, else from sessions
+    const decayEl = document.getElementById('hist-peak-decay');
+    if (AppState.lastDecayMs != null) {
+      decayEl.textContent = AppState.lastDecayMs >= 1000 ? (AppState.lastDecayMs / 1000).toFixed(1) + 's' : AppState.lastDecayMs + 'ms';
+    } else {
+      decayEl.textContent = '--';
+    }
+
+    // Tension stability: 1 - (stddev of variances / mean target) * 100
+    const variances = measured.map(s => parseFloat(s.variance));
+    const meanVar = variances.reduce((a, b) => a + b, 0) / variances.length;
+    const stddev = Math.sqrt(variances.reduce((s, v) => s + (v - meanVar) ** 2, 0) / variances.length);
+    const headObj = AppState.getHead(drumLabel !== 'ALL' ? drumLabel : undefined);
+    const stability = Math.max(0, 100 - (stddev / (headObj ? headObj.targetFreq : 200)) * 100 * 10).toFixed(1);
+    document.getElementById('hist-stability').textContent = stability + '%';
+  } else {
+    document.getElementById('hist-peak-decay').textContent = '--';
+    document.getElementById('hist-stability').textContent = '--';
+  }
+
+  const log = document.getElementById('session-log');
+  log.innerHTML = '';
+  filtered.slice(0, 15).forEach(s => {
+    const d = new Date(s.date);
+    const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase() + ' / ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+    const variance = s.variance != null ? parseFloat(s.variance) : null;
+    const varColor = variance != null ? (Math.abs(variance) < 1 ? 'text-primary-container' : 'text-error') : 'text-outline';
+    const varStr = variance != null ? ((variance >= 0 ? '+' : '') + s.variance + ' Hz') : 'pending';
+    log.innerHTML += `
+      <div class="flex items-center justify-between p-3 bg-surface-container-low">
+        <div class="flex items-center gap-4">
+          <span class="font-mono text-[10px] text-secondary opacity-50">${dateStr}</span>
+          <div>
+            <p class="text-sm font-bold uppercase tracking-wide text-primary">${s.drum} ${(s.head || 'batter').toUpperCase()}</p>
+            <p class="text-[10px] text-secondary uppercase">${s.mode}</p>
+          </div>
+        </div>
+        <div class="text-right">
+          <p class="text-[10px] text-secondary uppercase">Variance</p>
+          <p class="text-xs font-mono ${varColor}">${varStr}</p>
+        </div>
+      </div>`;
+  });
+
+  drawHistoryChart();
+}
+
+function timeSince(date) {
+  const s = Math.floor((new Date() - date) / 1000);
+  if (s < 60) return s + 'S AGO';
+  const m = Math.floor(s / 60);
+  if (m < 60) return m + 'M AGO';
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + 'H AGO';
+  return Math.floor(h / 24) + 'D AGO';
+}
+
+function drawHistoryChart() {
+  const canvas = document.getElementById('history-chart');
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+
+  // Use real session data (filtered by drum)
+  const allSessions = getSessions();
+  const filteredSessions = historyFilter === 'ALL' ? allSessions : allSessions.filter(s => s.drum === historyFilter);
+  const sessions = filteredSessions.filter(s => s.measuredFreq != null).slice(0, 30).reverse();
+  const points = sessions.length;
+
+  const mid = h / 2;
+
+  // Grid
+  ctx.strokeStyle = 'rgba(185,199,224,0.1)';
+  ctx.lineWidth = 0.5;
+  for (let y = 0; y < h; y += h / 4) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+  }
+
+  // Target line
+  ctx.strokeStyle = 'rgba(185,199,224,0.3)';
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(w, mid); ctx.stroke();
+  ctx.setLineDash([]);
+
+  if (points < 2) {
+    // Not enough data — show placeholder text
+    ctx.fillStyle = 'rgba(185,199,224,0.3)';
+    ctx.font = '11px Space Grotesk';
+    ctx.textAlign = 'center';
+    ctx.fillText('Start tuning to build history', w / 2, mid);
+    return;
+  }
+
+  // Compute scale from variance range
+  const variances = sessions.map(s => parseFloat(s.variance) || 0);
+  const maxVar = Math.max(Math.abs(Math.min(...variances)), Math.abs(Math.max(...variances)), 2);
+  const scale = (h / 2 - 10) / maxVar;
+
+  // Data line
+  ctx.strokeStyle = '#00F5FF';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (let i = 0; i < points; i++) {
+    const x = (i / (points - 1)) * w;
+    const y = mid - variances[i] * scale;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // Fill under
+  ctx.lineTo(w, mid);
+  ctx.lineTo(0, mid);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(0,245,255,0.05)';
+  ctx.fill();
+
+  // Data points
+  ctx.fillStyle = '#00F5FF';
+  for (let i = 0; i < points; i++) {
+    const x = (i / (points - 1)) * w;
+    const y = mid - variances[i] * scale;
+    ctx.beginPath(); ctx.arc(x, y, 2, 0, Math.PI * 2); ctx.fill();
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// RESONANCE PAGE
+// ══════════════════════════════════════════════════════
+let resonanceAnimFrame = null;
+let resPeakDb = -Infinity;
+
+function initResonancePage() {
+  const toggle = document.getElementById('resonance-head-toggle');
+  if (toggle) toggle.innerHTML = headToggleHTML();
+  updateHeadRelationship();
+  updateRingSustain();
+  drawResonanceSpectrum();
+  if (AppState.micActive) startResonanceLive();
+}
+
+// Head relationship display
+function updateHeadRelationship() {
+  const drum = AppState.getDrum();
+  if (!drum) return;
+  const bat = drum.batter;
+  const res = drum.resonant;
+
+  document.getElementById('res-batter-freq').textContent = bat.targetFreq + ' Hz';
+  document.getElementById('res-batter-note').textContent = hzToNote(bat.targetFreq);
+  document.getElementById('res-reso-freq').textContent = res.targetFreq + ' Hz';
+  document.getElementById('res-reso-note').textContent = hzToNote(res.targetFreq);
+
+  const ratio = res.targetFreq / bat.targetFreq;
+  const pctDiff = Math.round((ratio - 1) * 100);
+  const arrow = document.getElementById('res-rel-arrow');
+  const pctEl = document.getElementById('res-rel-pct');
+  const textEl = document.getElementById('res-rel-text');
+
+  if (pctDiff > 2) {
+    arrow.textContent = '↑';
+    pctEl.textContent = 'RES +' + pctDiff + '%';
+    const isSnare = classifyDrum(AppState.selectedDrum) === 'snare';
+    if (isSnare) {
+      textEl.textContent = 'Snare-side head is tuned higher for crisp wire response. This is standard — the thin snare-side head needs high tension to keep the wires snappy.';
+    } else if (pctDiff > 15) {
+      textEl.textContent = 'Resonant much higher = very singing, melodic sustain with strong upward pitch bend. The drum will ring a lot — great for jazz and open tuning.';
+    } else {
+      textEl.textContent = 'Resonant slightly higher = pleasant downward pitch bend after the attack ("dooooom"). Good sustain and musical tone. This is the most common tuning approach.';
+    }
+  } else if (pctDiff < -2) {
+    arrow.textContent = '↓';
+    pctEl.textContent = 'RES ' + pctDiff + '%';
+    if (Math.abs(pctDiff) > 15) {
+      textEl.textContent = 'Resonant much lower = very short, punchy sound with minimal ring. The drum will choke quickly — good for metal, funk, and controlled playing.';
+    } else {
+      textEl.textContent = 'Resonant lower = punchier attack with less ring. Upward pitch bend after the strike. Good for rock and modern styles where control matters.';
+    }
+  } else {
+    arrow.textContent = '=';
+    pctEl.textContent = 'EQUAL';
+    textEl.textContent = 'Both heads at the same pitch = maximum sustain and the purest fundamental note. Great for studio recording — clean, predictable, easy to mic.';
+  }
+}
+
+// Ring / sustain assessment
+function updateRingSustain() {
+  const ms = AppState.lastDecayMs;
+  const label = document.getElementById('res-ring-label');
+  const bar = document.getElementById('res-ring-bar');
+  const advice = document.getElementById('res-ring-advice');
+
+  if (ms == null) {
+    label.textContent = '--';
+    bar.style.width = '0%';
+    advice.textContent = 'Strike the drum to measure sustain.';
+    return;
+  }
+
+  const pct = Math.min(ms / 3000 * 100, 100);
+  bar.style.width = pct + '%';
+
+  if (ms < 400) {
+    label.textContent = 'Very Short — ' + ms + 'ms';
+    advice.textContent = 'Very controlled, dry sound. If you want more sustain, try loosening the muffling or tuning the resonant head slightly higher.';
+  } else if (ms < 800) {
+    label.textContent = 'Short — ' + ms + 'ms';
+    advice.textContent = 'Tight and punchy. Good for studio and controlled styles. The drum cuts through a mix well without excess ring.';
+  } else if (ms < 1500) {
+    label.textContent = 'Medium — ' + (ms / 1000).toFixed(1) + 's';
+    advice.textContent = 'Balanced sustain. Works in most situations. The drum has body and tone without excessive ring.';
+  } else if (ms < 2500) {
+    label.textContent = 'Long — ' + (ms / 1000).toFixed(1) + 's';
+    advice.textContent = 'Lots of ring and sustain. Great for open jazz/vintage styles. If it\'s too much, try a small muffling gel or moon gel near the edge.';
+  } else {
+    label.textContent = 'Very Long — ' + (ms / 1000).toFixed(1) + 's';
+    advice.textContent = 'Very ringy — the drum sustains a long time. If unwanted, try adding muffling (moon gel, tape, or an O-ring). Or tune the resonant head closer to the batter.';
+  }
+}
+
+// Tone character analysis from overtone data
+function describeToneCharacter(fundamental, peaks, decayMs) {
+  const label = document.getElementById('res-tone-label');
+  const desc = document.getElementById('res-tone-desc');
+  const icon = document.getElementById('res-tone-icon');
+
+  if (!fundamental) {
+    label.textContent = 'Strike to analyze';
+    desc.textContent = 'Hit your drum with the mic on and we\'ll tell you how it sounds.';
+    icon.innerHTML = '<span class="material-symbols-outlined text-secondary">mic</span>';
+    return;
+  }
+
+  const overtoneEnergy = peaks.slice(1).reduce((s, p) => s + p.amplitude, 0);
+  const fundamentalEnergy = fundamental.amplitude;
+  const clarity = fundamentalEnergy / (fundamentalEnergy + overtoneEnergy);
+
+  let toneLabel, toneDesc, toneColor;
+
+  if (clarity > 0.6) {
+    if (fundamental.freq < 100) {
+      toneLabel = 'Deep & Pure'; toneColor = 'text-primary-container';
+      toneDesc = 'Strong fundamental with clean low end. The drum has a clear, defined pitch without a lot of competing overtones. Great for a focused, modern sound.';
+    } else {
+      toneLabel = 'Warm & Focused'; toneColor = 'text-primary-container';
+      toneDesc = 'The fundamental note dominates — clean and musical. This drum will sit well in a mix and have a clear, defined pitch.';
+    }
+  } else if (clarity > 0.35) {
+    if (decayMs && decayMs > 1200) {
+      toneLabel = 'Open & Singing'; toneColor = 'text-primary';
+      toneDesc = 'A blend of fundamental and overtones with good sustain. The drum has character and musicality — it sings after the attack. Great for jazz and melodic playing.';
+    } else {
+      toneLabel = 'Balanced & Full'; toneColor = 'text-primary';
+      toneDesc = 'Good balance between fundamental pitch and overtone complexity. The drum has body and character without being harsh. Works across many styles.';
+    }
+  } else if (clarity > 0.2) {
+    toneLabel = 'Bright & Complex'; toneColor = 'text-tertiary';
+    toneDesc = 'Lots of overtone activity. The drum has a complex, bright character. If it sounds harsh, try muffling slightly or detuning one lug a quarter turn to tame the overtones.';
+  } else {
+    toneLabel = 'Harsh / Boxy'; toneColor = 'text-error';
+    toneDesc = 'Overtones are overpowering the fundamental. The drum may sound "boxy" or choked. Try re-seating the head, checking for even lug tension, or adding slight muffling.';
+  }
+
+  label.textContent = toneLabel;
+  label.className = 'text-2xl font-bold mt-1 ' + toneColor;
+  desc.textContent = toneDesc;
+  icon.innerHTML = `<span class="material-symbols-outlined ${toneColor}">${clarity > 0.35 ? 'check_circle' : clarity > 0.2 ? 'info' : 'warning'}</span>`;
+}
+
+function analyzeOvertones() {
+  if (!AppState.micActive || !AudioEngine.freqData) {
+    alert('Start the microphone on the Tuner page first, then come back here and strike the drum.');
+    return;
+  }
+
+  const freqData = AudioEngine.freqData;
+  const sampleRate = AudioEngine.getSampleRate();
+  const binCount = freqData.length;
+  const binHz = sampleRate / 2 / binCount;
+
+  const threshold = 40;
+  const peaks = [];
+  for (let i = 2; i < binCount - 2; i++) {
+    if (freqData[i] > threshold &&
+        freqData[i] > freqData[i-1] && freqData[i] > freqData[i-2] &&
+        freqData[i] > freqData[i+1] && freqData[i] > freqData[i+2]) {
+      const freq = i * binHz;
+      if (freq > 30 && freq < 10000) peaks.push({ freq, amplitude: freqData[i] });
+    }
+  }
+
+  peaks.sort((a, b) => b.amplitude - a.amplitude);
+  const topPeaks = peaks.slice(0, 8).sort((a, b) => a.freq - b.freq);
+  const fundamental = topPeaks.length > 0 ? topPeaks[0] : null;
+
+  // Update tone character
+  describeToneCharacter(fundamental, topPeaks, AppState.lastDecayMs);
+
+  // Show overtone results in plain language
+  const resultDiv = document.getElementById('res-overtone-result');
+  const listDiv = document.getElementById('res-harmonics-list');
+  resultDiv.classList.remove('hidden');
+  listDiv.innerHTML = '';
+
+  if (topPeaks.length === 0) {
+    listDiv.innerHTML = '<p class="text-[10px] text-secondary">No sound detected. Make sure the mic is on and strike the drum harder.</p>';
+    return;
+  }
+
+  topPeaks.forEach((p, i) => {
+    const strength = p.amplitude / 255;
+    const strengthLabel = strength > 0.7 ? 'Strong' : strength > 0.4 ? 'Moderate' : 'Faint';
+    const strengthColor = i === 0 ? 'text-primary-container' : (strength > 0.5 ? 'text-tertiary-container' : 'text-secondary');
+
+    let freqLabel;
+    if (i === 0) {
+      freqLabel = 'Fundamental (main pitch)';
+    } else if (fundamental && Math.abs(p.freq / fundamental.freq - Math.round(p.freq / fundamental.freq)) < 0.1) {
+      const harmNum = Math.round(p.freq / fundamental.freq);
+      freqLabel = 'Harmonic × ' + harmNum;
+    } else {
+      freqLabel = 'Overtone';
+    }
+
+    // Flag problem overtones
+    let problemNote = '';
+    if (i > 0 && strength > 0.5 && fundamental) {
+      const ratio = p.freq / fundamental.freq;
+      if (Math.abs(ratio - Math.round(ratio)) > 0.15) {
+        problemNote = '<span class="text-error text-[9px] ml-2">— non-harmonic, may sound harsh. Try muffling.</span>';
+      }
+    }
+
+    listDiv.innerHTML += `
+      <div class="flex items-center justify-between p-2.5 ${i === 0 ? 'bg-primary-container/10 border-l-2 border-primary-container' : 'bg-surface-container-high'}">
+        <div class="flex-1">
+          <span class="text-[10px] ${i === 0 ? 'text-primary-container font-bold' : 'text-secondary'}">${freqLabel}${problemNote}</span>
+        </div>
+        <span class="font-mono text-[11px] text-primary mx-2">${p.freq.toFixed(0)} Hz</span>
+        <span class="text-[9px] ${strengthColor} w-14 text-right">${strengthLabel}</span>
+      </div>`;
+  });
+}
+
+// Update resonance page on strike
+EventBus.on('strike-detected', (freq) => {
+  if (AppState.currentPage === 'resonance') {
+    document.getElementById('res-freq').textContent = freq.toFixed(1) + ' Hz';
+    // Auto-analyze after a short delay to let decay settle
+    setTimeout(() => {
+      if (AppState.currentPage === 'resonance') analyzeOvertones();
+    }, 200);
+  }
+});
+
+EventBus.on('decay-measured', () => {
+  if (AppState.currentPage === 'resonance') updateRingSustain();
+});
+
+function startResonanceLive() {
+  if (resonanceAnimFrame) cancelAnimationFrame(resonanceAnimFrame);
+  function loop() {
+    if (AppState.currentPage !== 'resonance' || !AppState.micActive) {
+      resonanceAnimFrame = null;
+      return;
+    }
+    drawLiveResonanceSpectrum();
+    resonanceAnimFrame = requestAnimationFrame(loop);
+  }
+  loop();
+}
+
+EventBus.on('mic-started', () => {
+  if (AppState.currentPage === 'resonance') {
+    resPeakDb = -Infinity;
+    startResonanceLive();
+  }
+});
+
+function drawResonanceSpectrum() {
+  const canvas = document.getElementById('resonance-spectrum');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  drawSpectrumGrid(ctx, w, h);
+
+  if (AppState.micActive && AudioEngine.freqData) return;
+
+  // Static placeholder
+  ctx.strokeStyle = '#00F5FF';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  const headObj = AppState.getHead();
+  const targetFreq = headObj ? headObj.targetFreq : 184;
+  for (let i = 0; i < 200; i++) {
+    const x = (i / 200) * w;
+    const f = 20 * Math.pow(1000, i / 200);
+    let y = h * 0.8;
+    y -= Math.exp(-Math.pow((f - targetFreq) / 20, 2)) * h * 0.6;
+    y -= Math.exp(-Math.pow((f - targetFreq * 2) / 30, 2)) * h * 0.3;
+    y -= Math.exp(-Math.pow((f - targetFreq * 3) / 40, 2)) * h * 0.15;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath();
+  ctx.fillStyle = 'rgba(0,245,255,0.08)';
+  ctx.fill();
+}
+
+function drawLiveResonanceSpectrum() {
+  const canvas = document.getElementById('resonance-spectrum');
+  if (!canvas || !AudioEngine.freqData) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  drawSpectrumGrid(ctx, w, h);
+
+  const freqData = AudioEngine.freqData;
+  const binCount = freqData.length;
+  const sampleRate = AudioEngine.getSampleRate();
+  const gateThreshold = parseInt(document.getElementById('res-gate')?.value || -24);
+  const gateLinear = Math.pow(10, gateThreshold / 20) * 255;
+
+  ctx.strokeStyle = '#00F5FF';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  let started = false;
+
+  for (let i = 1; i < binCount; i++) {
+    const freq = (i / binCount) * (sampleRate / 2);
+    if (freq < 20 || freq > 20000) continue;
+    const x = (Math.log10(freq / 20) / Math.log10(1000)) * w;
+    const val = Math.max(freqData[i] - gateLinear, 0);
+    const y = h - (val / 255) * h;
+    if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  if (started) {
+    ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath();
+    ctx.fillStyle = 'rgba(0,245,255,0.08)';
+    ctx.fill();
+  }
+
+  // Mark detected frequency
+  if (AppState.currentFreq && AppState.currentFreq > 20) {
+    const peakX = (Math.log10(AppState.currentFreq / 20) / Math.log10(1000)) * w;
+    ctx.fillStyle = '#00F5FF';
+    ctx.beginPath(); ctx.arc(peakX, 10, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.font = '9px Space Grotesk';
+    ctx.fillText(AppState.currentFreq.toFixed(0) + ' Hz', peakX + 8, 14);
+  }
+}
+
+function drawSpectrumGrid(ctx, w, h) {
+  ctx.strokeStyle = 'rgba(185,199,224,0.08)';
+  ctx.lineWidth = 0.5;
+  for (let x = 0; x < w; x += w / 6) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+  for (let y = 0; y < h; y += h / 4) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+}
+
+// ══════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════
+AppState.init();
+// Default kit matches STANDARD preset
+if (!AppState.activePreset) AppState.activePreset = 'STANDARD';
+navigateTo('tuner');
+
+// Spin animation
+const style = document.createElement('style');
+style.textContent = '@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }';
+document.head.appendChild(style);
+</script>
+</body>
+</html>
