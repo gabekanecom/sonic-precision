@@ -48,7 +48,7 @@ tailwind.config = {
   }
   .glass-panel { background: rgba(45,52,73,0.6); backdrop-filter: blur(20px); }
   .drum-glow { box-shadow: 0 0 20px rgba(0,245,255,0.3); }
-  .page { display: none; }
+  .page { display: none; padding-top: calc(3.5rem + env(safe-area-inset-top, 0px)) !important; }
   .page.active { display: flex; flex-direction: column; }
   .waveform-gradient { background: linear-gradient(to top, rgba(0,245,255,0.2) 0%, rgba(11,19,38,0) 100%); }
   .lug-node { position: absolute; }
@@ -71,7 +71,7 @@ tailwind.config = {
 <body class="bg-surface text-on-surface font-body overflow-x-hidden selection:bg-primary-container selection:text-on-primary min-h-screen flex flex-col">
 
 <!-- ═══════ TOP APP BAR ═══════ -->
-<header class="bg-[#0b1326] fixed top-0 w-full z-50 flex justify-between items-center px-5 h-14 safe-area-top">
+<header class="bg-[#0b1326] fixed top-0 w-full z-50 flex justify-between items-center px-5" style="padding-top: env(safe-area-inset-top, 0px); height: calc(3.5rem + env(safe-area-inset-top, 0px));">
   <div class="flex items-center gap-2">
     <span class="material-symbols-outlined text-[#00F5FF]" style="font-size:22px">graphic_eq</span>
     <h1 class="text-lg font-bold tracking-tighter text-[#00F5FF]">SONIC PRECISION</h1>
@@ -85,7 +85,7 @@ tailwind.config = {
 <!-- ═══════════════════════════════════════════════════ -->
 <!-- PAGE: TUNER                                        -->
 <!-- ═══════════════════════════════════════════════════ -->
-<main id="page-tuner" class="page active flex-1 pt-14 pb-20 px-5 overflow-y-auto oscilloscope-bg max-w-lg mx-auto w-full">
+<main id="page-tuner" class="page active flex-1 pb-20 px-5 overflow-y-auto oscilloscope-bg max-w-lg mx-auto w-full">
   <!-- Mode Switcher -->
   <div id="tuner-mode-switcher" class="max-w-sm mx-auto mt-3 mb-2"></div>
 
@@ -177,7 +177,7 @@ tailwind.config = {
 <!-- ═══════════════════════════════════════════════════ -->
 <!-- PAGE: KIT                                          -->
 <!-- ═══════════════════════════════════════════════════ -->
-<main id="page-kit" class="page flex-1 pt-14 pb-20 px-5 overflow-y-auto max-w-lg mx-auto w-full">
+<main id="page-kit" class="page flex-1 pb-20 px-5 overflow-y-auto max-w-lg mx-auto w-full">
   <div class="flex justify-between items-center mt-4 mb-2">
     <div>
       <p class="uppercase tracking-[0.1em] text-[0.6rem] text-secondary opacity-60">SYSTEM STATUS</p>
@@ -260,7 +260,7 @@ tailwind.config = {
 <!-- ═══════════════════════════════════════════════════ -->
 <!-- PAGE: LUGS (sub-page of Kit)                       -->
 <!-- ═══════════════════════════════════════════════════ -->
-<main id="page-lugs" class="page flex-1 pt-14 pb-20 px-5 overflow-y-auto max-w-lg mx-auto w-full">
+<main id="page-lugs" class="page flex-1 pb-20 px-5 overflow-y-auto max-w-lg mx-auto w-full">
   <!-- Mode Switcher -->
   <div id="lugs-mode-switcher" class="max-w-sm mx-auto mt-3 mb-2"></div>
 
@@ -337,7 +337,7 @@ tailwind.config = {
 <!-- ═══════════════════════════════════════════════════ -->
 <!-- PAGE: PRESETS                                      -->
 <!-- ═══════════════════════════════════════════════════ -->
-<main id="page-presets" class="page flex-1 pt-14 pb-20 px-5 overflow-y-auto max-w-lg mx-auto w-full">
+<main id="page-presets" class="page flex-1 pb-20 px-5 overflow-y-auto max-w-lg mx-auto w-full">
   <div class="mt-4 mb-2">
     <p class="uppercase tracking-[0.1em] text-[0.6rem] text-secondary opacity-60">ARCHIVE / CONFIGURATIONS</p>
     <h2 class="text-2xl font-bold tracking-tight">PRESET LIBRARY</h2>
@@ -359,7 +359,7 @@ tailwind.config = {
 <!-- ═══════════════════════════════════════════════════ -->
 <!-- PAGE: HISTORY                                      -->
 <!-- ═══════════════════════════════════════════════════ -->
-<main id="page-history" class="page flex-1 pt-14 pb-20 px-5 overflow-y-auto max-w-lg mx-auto w-full">
+<main id="page-history" class="page flex-1 pb-20 px-5 overflow-y-auto max-w-lg mx-auto w-full">
   <div class="mt-4 mb-1">
     <p class="uppercase tracking-[0.1em] text-[0.6rem] text-secondary opacity-60" id="hist-drum-id">DRUM ID: SN-2940-B</p>
     <h2 class="text-2xl font-bold tracking-tight">SNARE STABILITY</h2>
@@ -446,7 +446,7 @@ tailwind.config = {
 <!-- ═══════════════════════════════════════════════════ -->
 <!-- PAGE: RESONANCE                                    -->
 <!-- ═══════════════════════════════════════════════════ -->
-<main id="page-resonance" class="page flex-1 pt-14 pb-20 px-5 overflow-y-auto max-w-lg mx-auto w-full">
+<main id="page-resonance" class="page flex-1 pb-20 px-5 overflow-y-auto max-w-lg mx-auto w-full">
   <!-- Mode Switcher -->
   <div id="resonance-mode-switcher" class="max-w-sm mx-auto mt-3 mb-2"></div>
 
@@ -551,7 +551,7 @@ tailwind.config = {
 <!-- ═══════════════════════════════════════════════════ -->
 <!-- PAGE: QUICK CHECK                                  -->
 <!-- ═══════════════════════════════════════════════════ -->
-<main id="page-check" class="page flex-1 pt-14 pb-20 px-5 overflow-y-auto max-w-lg mx-auto w-full">
+<main id="page-check" class="page flex-1 pb-20 px-5 overflow-y-auto max-w-lg mx-auto w-full">
   <div class="mt-4 mb-4">
     <h2 class="text-2xl font-bold tracking-tight">QUICK CHECK</h2>
     <p class="text-[9px] text-outline uppercase tracking-wider mt-1">Tap any drum to tune it. Start the mic first.</p>
